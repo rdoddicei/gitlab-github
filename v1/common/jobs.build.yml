@@ -1,0 +1,20 @@
+include:
+  - local: 'v1/common/templates.yml'
+
+Semver:
+  extends: .semver_template
+
+Build_Image:
+  extends: .build_image_template
+
+Build_Image[MR]:
+  extends: .build_image_no_push_template
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+
+Build_Image[Branch]:
+  extends: .build_image_no_push_template
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/ || $CI_COMMIT_BRANCH =~ /^feature/
+      when: never
+    - if: $CI_COMMIT_BRANCH

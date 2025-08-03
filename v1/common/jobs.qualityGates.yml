@@ -1,0 +1,167 @@
+include:
+  - local: 'v1/common/templates.yml'
+  - local: 'v1/common/readyAPI/jobs.smoke.yml'
+  - local: 'v1/common/readyAPI/jobs.regression.yml'
+
+variables:
+  TMPL_SONAR_REPORT_FILE: './coverage/lcov.info'
+  TMPL_SONAR_SOURCES: .
+
+# -------------------------------
+# Quality Gate: Unit Test (.NET)
+# -------------------------------
+Unit_Test[.NET]:
+  extends: .unit_test_template
+  script:
+    - apt-get update
+    - dotnet restore ./$(PROJ_SOLUTION_NAME).sln
+    - echo -e "\e[0Ksection_start:`date +%s`:test_section[collapsed=true]\r\e[0KRunning unit tests..."
+    - dotnet test ./$(PROJ_SOLUTION_NAME).sln \
+        --test-adapter-path:. \
+        --logger:"junit;LogFilePath=../reports/unit/{assembly}-unitTest-results.xml;MethodFormat=Class;FailureBodyFormat=Verbose" \
+        --collect:"XPlat Code Coverage" \
+        --results-directory ./reports/coverage
+    - echo -e "\e[0Ksection_end:`date +%s`:test_section\r\e[0K"
+    - dotnet tool install dotnet-reportgenerator-globaltool --tool-path tools
+    - ./tools/reportgenerator "-reports:./reports/**/coverage.cobertura.xml" "-targetdir:reports/coverage" "-reporttypes:TextSummary"
+    - cat ./reports/coverage/Summary.txt
+  coverage: /Branch coverage[\s\S]*?/
+  artifacts:
+    when: always
+    reports:
+      junit: '**/*unitTest-results.xml'
+      coverage_report:
+        coverage_format: cobertura
+        path: '**/coverage.cobertura.xml'
+  rules:
+    - if: $DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET || $DEVOPS_QG_OVERRIDE
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_ID
+      exists:
+        - "**/*[Tt]ests.csproj"
+      when: always
+
+# -------------------------------
+# Quality Gate: Unit Test (NodeJS)
+# -------------------------------
+Unit_Test[NodeJS]:
+  extends: .unit_test_template
+  script:
+    - !reference [.script_test_setup, script]
+    - echo -e "\e[0Ksection_start:`date +%s`:npmi_section[collapsed=true]\r\e[0KInstalling dependencies..."
+    - npm ci
+    - echo -e "\e[0Ksection_end:`date +%s`:npmi_section\r\e[0K"
+    - echo -e "\e[0Ksection_start:`date +%s`:test_section[collapsed=true]\r\e[0KRunning unit tests..."
+    - npm run test
+    - echo -e "\e[0Ksection_end:`date +%s`:test_section\r\e[0K"
+  coverage: /All files[^|]*\|[^|]*\|[^|]*\s+([\d\.]+)/
+  artifacts:
+    when: always
+    reports:
+      junit: ./reports/junit.xml
+  rules:
+    - if: $DEVOPS_QG_OVERRIDE_UNIT_TESTS_NODEJS || $DEVOPS_QG_OVERRIDE
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_ID
+      exists:
+        - "**/*[Tt]est.ts"
+        - "**/*[Ss]pec.ts"
+      when: always
+
+# -------------------------------
+# Quality Gate: Sonarqube (.NET)
+# -------------------------------
+Sonarqube[.NET]:
+  extends: sonarQube_template
+  script:
+    - sed -i '1,2.0.0/s/1.2.0.0/$COVERLET_VERSION/' /var/runsetting
+    - dotnet restore ./$(PROJ_SOLUTION_NAME).sln
+    - dotnet sonarscanner begin /k:"$PROJ_SOLUTION_NAME" /n:"$PROJ_SOLUTION_NAME" /v:"$BUILDNUMBER" /d:sonar.login="$SCRT_SONAR_LOGIN_INBCU" /d:sonar.host.url="https://sonar.inbcu.com" /d:sonar.coverageReportPaths="SonarQube.xml"
+    - dotnet build ./$(PROJ_SOLUTION_NAME).sln
+    - dotnet test ./$(PROJ_TEST_DIRECTORY) --settings /var/runsetting
+    - reportgenerator -reports:./$(PROJ_TEST_DIRECTORY)/TestResults/*/coverage.cobertura.xml -targetdir:. -reporttypes:SonarQube
+    - cp SonarQube.xml ./$(PROJ_TEST_DIRECTORY)/SonarQube.xml
+    - cp SonarQube.xml ./$(PROJ_SOLUTION_NAME)/SonarQube.xml
+    - dotnet sonarscanner end /d:sonar.login="$SCRT_SONAR_LOGIN_INBCU"
+  rules:
+    - if: $DEVOPS_QG_OVERRIDE_SONARQUBE || $DEVOPS_QG_OVERRIDE
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_ID
+      exists:
+        - "**/*[Tt]ests.csproj"
+      when: always
+  allow_failure: false
+
+# -------------------------------
+# Quality Gate: Sonarqube (NodeJS)
+# -------------------------------
+Sonarqube[NodeJS]:
+  extends: sonarQube_template
+  cache:
+    key: "$CI_JOB_NAME"
+    paths:
+      - /root/.sonar
+  script:
+    - !reference [.script_test_setup, script]
+    - npm ci
+    - npm run test
+    - >
+      SONAR_SCANNER_OPTS="${SONAR_SCANNER_OPTS} -Dsonar.login=$SCRT_SONAR_LOGIN_INBCU
+      -Dsonar.projectKey=$PROJ_SERVICE_NAME
+      -Dsonar.projectName=$PROJ_SERVICE_NAME
+      -Dsonar.projectVersion=$CI_PIPELINE_ID
+      -Dsonar.pullrequest.branch=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+      -Dsonar.pullrequest.base=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+      -Dsonar.pullrequest.key=$CI_MERGE_REQUEST_IID
+      -Dsonar.scm.revision=$CI_MERGE_REQUEST_TARGET_BRANCH_SHA
+      -Dsonar.sources=$TMPL_SONAR_SOURCES
+      -Dsonar.typescript.lcov.reportPaths=$TMPL_SONAR_REPORT_FILE
+      -Dsonar.qualitygate.wait=true
+      -Dsonar.tests="
+    - sonar-scanner
+  rules:
+    - if: $DEVOPS_QG_OVERRIDE_SONARQUBE || $DEVOPS_QG_OVERRIDE
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_ID
+      exists:
+        - "**/*[Tt]est.ts"
+        - "**/*[Ss]pec.ts"
+      when: always
+  allow_failure: false
+
+# -----------------------------------
+# [Optional/Commented Out] MR-specific SonarQube job
+# -----------------------------------
+#Sonarqube[MR]:
+#  stage: Quality_Gates
+#  image: harbor.use.ucdp.net/upto_common/upr-sonarqube-image:$PROJ_NODE_MAJOR_VERSION
+#  cache:
+#    key: "${CI_JOB_NAME}"
+#    paths:
+#      - /root/.sonar
+#  script:
+#    - cp $SCRT_NPMRC_TOKEN .npmrc
+#    - if [ -f "$UNIT_TEST_DOTENV" ]; then cp $UNIT_TEST_DOTENV ./.env; fi
+#    - npm i
+#    - npm run test
+#    - >
+#      SONAR_SCANNER_OPTS="${SONAR_SCANNER_OPTS} -Dsonar.login=$SCRT_SONAR_LOGIN_INBCU
+#      -Dsonar.projectKey=$PROJ_SERVICE_NAME
+#      -Dsonar.projectName=$PROJ_SERVICE_NAME
+#      -Dsonar.projectVersion=$CI_PIPELINE_ID
+#      -Dsonar.pullrequest.branch=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+#      -Dsonar.pullrequest.base=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+#      -Dsonar.pullrequest.key=$CI_MERGE_REQUEST_IID
+#      -Dsonar.scm.revision=$CI_MERGE_REQUEST_TARGET_BRANCH_SHA
+#      -Dsonar.sources=$TMPL_SONAR_SOURCES
+#      -Dsonar.typescript.lcov.reportPaths=$TMPL_SONAR_REPORT_FILE
+#      -Dsonar.qualitygate.wait=true
+#      -Dsonar.tests="
+#    - sonar-scanner -X
+#  rules:
+#    - if: $DEVOPS_QG_OVERRIDE_SONARQUBE || $DEVOPS_QG_OVERRIDE
+#      when: never
+#    - if: $CI_MERGE_REQUEST_ID
+#  allow_failure: false
+#  tags:
+#    - docker

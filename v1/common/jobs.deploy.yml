@@ -1,0 +1,502 @@
+include:
+  - local: 'v1/common/templates.yml'
+
+# Deploy feature branches to Dev Environment
+variables:
+  TMPL_KUBE_CONFIG_B1A: null
+  TMPL_KUBE_CONFIG_B135: null
+  TMPL_KUBE_CONFIG_B1A_PCI: null
+  TMPL_KUBE_CONFIG_B135_PCI: null
+  TMPL_KUBE_CONFIG_B1360_PCI: null
+  TMPL_KUBE_CONFIG_B551: null
+  TMPL_RUNNER_TAG: docker
+
+Deploy_Feature[UO-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[UO-PCI-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy_Feature[USH-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[USH-PCI-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy_Feature[USJ-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[USJ-PCI-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[EASTUS-AZURE-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[USJ-AZURE-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature[EASTUS-AWS-DEV]:
+  extends: deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AWS
+    TMPL_DATACENTER: eastus-aws
+    TMPL_ENVIRONMENT_NAME: dev
+
+# Deploy DEV Environment
+
+Deploy[UO-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[UO-PCI-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[USH-PCI-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USJ-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[USJ-PCI-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[EASTUS-AZURE-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[USJ-AZURE-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy[EASTUS-AWS-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-aws
+    TMPL_ENVIRONMENT_NAME: dev
+
+# Deploy QA Environment
+
+Deploy[UO-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: qa
+
+Deploy[UO-PCI-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: qa
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-PCI-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: qa
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: qa
+
+Deploy[USJ-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: qa
+
+Deploy[USJ-PCI-QA]:
+  extends: deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: qa
+
+# QA Deployments
+
+Deploy[USJ-AZURE-QA]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: qa
+
+Deploy[EASTUS-AZURE-QA]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: qa
+
+# UAT Deployments
+
+Deploy[UO-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy[UO-PCI-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: uat
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy[USH-PCI-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: uat
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USJ-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy[USJ-PCI-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy[USJ-AZURE-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy[EASTUS-AZURE-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: uat
+
+# STG Deployments
+
+Deploy[UO-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[UO-PCI-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: stg
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[USH-PCI-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: stg
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USJ-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[USJ-PCI-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[USJ-AZURE-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[EASTUS-AZURE-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy[EASTUS-AWS-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-aws
+    TMPL_ENVIRONMENT_NAME: stg
+
+# PROD Deployments
+
+Deploy[UO-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B1A
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy[UO-PCI-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B1A_PCI
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: prod
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USH-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_USH
+    TMPL_DATACENTER: ush
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy[USH-PCI-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B1360_PCI
+    TMPL_DATACENTER: ush-pci
+    TMPL_ENVIRONMENT_NAME: prod
+    TMPL_RUNNER_TAG: docker-pci
+
+Deploy[USJ-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B551
+    TMPL_DATACENTER: usj
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy[USJ-PCI-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B551_PCI
+    TMPL_DATACENTER: usj-pci
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy[USJ-AZURE-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_JAPANEAST
+    TMPL_DATACENTER: usj-azure
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy[EASTUS-AZURE-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_EASTUS_AKS
+    TMPL_DATACENTER: eastus-azure
+    TMPL_ENVIRONMENT_NAME: prod
+
+# Feature RKE2 (DEV) Deployments
+
+Deploy_Feature_RKE2[UO-DEV]:
+  extends: .deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: dev
+
+Deploy_Feature_RKE2[UO-PCI-DEV]:
+  extends: .deploy_feature_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+# General DEV Deployment
+
+Deploy[RKE2[UO-DEV]]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: dev
+
+# Deploy DEV Environment
+Deploy_RKE2[UO-PCI-DEV]:
+  extends: .deploy_development_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: dev
+    TMPL_RUNNER_TAG: docker-pci
+
+# Deploy QA Environment
+Deploy_RKE2[UO-QA]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: qa
+
+Deploy_RKE2[UO-PCI-QA]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: qa
+    TMPL_RUNNER_TAG: docker-pci
+
+# Deploy UAT Environment
+Deploy_RKE2[UO-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: uat
+
+Deploy_RKE2[UO-PCI-UAT]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: uat
+    TMPL_RUNNER_TAG: docker-pci
+
+# Deploy STG Environment
+Deploy_RKE2[UO-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: stg
+
+Deploy_RKE2[UO-PCI-STG]:
+  extends: .deploy_cluster_template
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: stg
+    TMPL_RUNNER_TAG: docker-pci
+
+# Deploy Production Environment
+Deploy_RKE2[UO-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B1A_RKE2
+    TMPL_DATACENTER: uo
+    TMPL_ENVIRONMENT_NAME: prod
+
+Deploy_RKE2[UO-PCI-PROD]:
+  extends: .deploy_cluster_template
+  stage: Production
+  variables:
+    TMPL_KUBE_CONFIG: $SCRT_PROD_KUBE_CONFIG_B1A_PCI_RKE2
+    TMPL_DATACENTER: uo-pci
+    TMPL_ENVIRONMENT_NAME: prod
+    TMPL_RUNNER_TAG: docker-pci
