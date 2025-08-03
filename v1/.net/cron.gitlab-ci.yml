@@ -1,0 +1,11 @@
+include:
+  - local: 'v1/common/templates.yml'
+  - local: 'v1/common/jobs.build.yml'
+  - local: 'v1/common/jobs.deploy.yml'
+  - local: 'v1/common/jobs.qualityGates.yml'
+
+variables:
+  TMPL_IS_CRON: "true"
+  TMPL_UNIT_TEST_IMAGE: mcr.microsoft.com/dotnet/sdk:7.0
+  DEVOPS_QG_OVERRIDE_SMOKE_TESTS: 1
+  DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: 1
