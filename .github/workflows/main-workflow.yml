@@ -1,0 +1,183 @@
+# Main GitHub Actions workflow that demonstrates usage of all reusable templates
+# This replaces the need for multiple individual pipeline files
+name: Main CI/CD Pipeline
+
+# Trigger conditions - customize based on your needs
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    # Run daily at 2 AM UTC for cron jobs
+    - cron: '0 2 * * *'
+
+# Global environment variables
+env:
+  CI_COMMIT_BRANCH: ${{ github.ref_name }}
+  CI_DEFAULT_BRANCH: main
+  CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+
+jobs:
+  # Detect project type and set up job matrix
+  detect-project-type:
+    runs-on: ubuntu-latest
+    outputs:
+      is_dotnet_service: ${{ steps.detect.outputs.is_dotnet_service }}
+      is_dotnet_processor: ${{ steps.detect.outputs.is_dotnet_processor }}
+      is_dotnet_cron: ${{ steps.detect.outputs.is_dotnet_cron }}
+      is_nuget_project: ${{ steps.detect.outputs.is_nuget_project }}
+      has_dockerfile: ${{ steps.detect.outputs.has_dockerfile }}
+      solution_name: ${{ steps.detect.outputs.solution_name }}
+      project_name: ${{ steps.detect.outputs.project_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Detect project characteristics
+        id: detect
+        run: |
+          # Check for .NET solution files
+          if ls *.sln 1> /dev/null 2>&1; then
+            SOLUTION_NAME=$(ls *.sln | head -1 | sed 's/.sln$//')
+            echo "solution_name=$SOLUTION_NAME" >> $GITHUB_OUTPUT
+            echo "Found solution: $SOLUTION_NAME"
+          fi
+          
+          # Check for specific project indicators
+          if [ -f "Dockerfile" ]; then
+            echo "has_dockerfile=true" >> $GITHUB_OUTPUT
+          fi
+          
+          # Detect project type based on patterns
+          if grep -r "Microsoft.AspNetCore" . --include="*.csproj" 2>/dev/null | grep -q .; then
+            echo "is_dotnet_service=true" >> $GITHUB_OUTPUT
+            echo "Detected: .NET Service project"
+          elif grep -r "Microsoft.Extensions.Hosting" . --include="*.csproj" 2>/dev/null | grep -q .; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "is_dotnet_cron=true" >> $GITHUB_OUTPUT
+              echo "Detected: .NET Cron project"
+            else
+              echo "is_dotnet_processor=true" >> $GITHUB_OUTPUT
+              echo "Detected: .NET Processor project"
+            fi
+          elif find . -name "*.nupkg" -o -name "*.nuspec" | grep -q .; then
+            echo "is_nuget_project=true" >> $GITHUB_OUTPUT
+            echo "Detected: NuGet package project"
+          fi
+          
+          # Set project name
+          PROJECT_NAME=${GITHUB_REPOSITORY##*/}
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
+  # .NET Service Pipeline
+  dotnet-service-pipeline:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.is_dotnet_service == 'true'
+    uses: ./.github/workflows/reusable-service-dotnet.yml
+    with:
+      TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:7.0"
+      TMPL_SONAR_IMAGE: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-7.0"
+      CI_COMMIT_BRANCH: ${{ github.ref_name }}
+      CI_DEFAULT_BRANCH: "main"
+      CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+    secrets: inherit
+
+  # .NET Processor Pipeline
+  dotnet-processor-pipeline:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.is_dotnet_processor == 'true'
+    uses: ./.github/workflows/reusable-processor-dotnet.yml
+    with:
+      TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:7.0"
+      TMPL_SONAR_IMAGE: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-7.0"
+      TMPL_HELM_ARGS: "--set serviceMonitor.enabled=false"
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS: "1"
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: "1"
+      CI_COMMIT_BRANCH: ${{ github.ref_name }}
+      CI_DEFAULT_BRANCH: "main"
+      CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+    secrets: inherit
+
+  # .NET Cron Pipeline
+  dotnet-cron-pipeline:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.is_dotnet_cron == 'true'
+    uses: ./.github/workflows/reusable-cron-dotnet.yml
+    with:
+      TMPL_IS_CRON: "true"
+      TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:7.0"
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS: "1"
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: "1"
+      CI_COMMIT_BRANCH: ${{ github.ref_name }}
+      CI_DEFAULT_BRANCH: "main"
+      CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+    secrets: inherit
+
+  # NuGet Package Pipeline
+  nuget-pipeline:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.is_nuget_project == 'true'
+    uses: ./.github/workflows/reusable-nuget-dotnet.yml
+    with:
+      SOLUTION_NAME: ${{ needs.detect-project-type.outputs.solution_name || 'Solution' }}
+      PROJ_NUGET_PACKAGE_NAME: ${{ needs.detect-project-type.outputs.project_name }}
+      CI_COMMIT_BRANCH: ${{ github.ref_name }}
+      CI_DEFAULT_BRANCH: "main"
+      CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+    secrets: inherit
+
+  # Generic Build Pipeline (fallback)
+  generic-build-pipeline:
+    needs: detect-project-type
+    if: |
+      needs.detect-project-type.outputs.is_dotnet_service != 'true' &&
+      needs.detect-project-type.outputs.is_dotnet_processor != 'true' &&
+      needs.detect-project-type.outputs.is_dotnet_cron != 'true' &&
+      needs.detect-project-type.outputs.is_nuget_project != 'true' &&
+      needs.detect-project-type.outputs.has_dockerfile == 'true'
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      CI_COMMIT_BRANCH: ${{ github.ref_name }}
+      CI_DEFAULT_BRANCH: "main"
+      CI_MERGE_REQUEST_ID: ${{ github.event.number }}
+    secrets: inherit
+
+  # Summary job
+  pipeline-summary:
+    runs-on: ubuntu-latest
+    needs: 
+      - detect-project-type
+      - dotnet-service-pipeline
+      - dotnet-processor-pipeline
+      - dotnet-cron-pipeline
+      - nuget-pipeline
+      - generic-build-pipeline
+    if: always()
+    steps:
+      - name: Pipeline Summary
+        run: |
+          echo "## Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Project Type Detection:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Solution Name: ${{ needs.detect-project-type.outputs.solution_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Project Name: ${{ needs.detect-project-type.outputs.project_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- .NET Service: ${{ needs.detect-project-type.outputs.is_dotnet_service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- .NET Processor: ${{ needs.detect-project-type.outputs.is_dotnet_processor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- .NET Cron: ${{ needs.detect-project-type.outputs.is_dotnet_cron }}" >> $GITHUB_STEP_SUMMARY
+          echo "- NuGet Project: ${{ needs.detect-project-type.outputs.is_nuget_project }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Has Dockerfile: ${{ needs.detect-project-type.outputs.has_dockerfile }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pipeline Results:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Service Pipeline: ${{ needs.dotnet-service-pipeline.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Processor Pipeline: ${{ needs.dotnet-processor-pipeline.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Cron Pipeline: ${{ needs.dotnet-cron-pipeline.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- NuGet Pipeline: ${{ needs.nuget-pipeline.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Generic Build: ${{ needs.generic-build-pipeline.result }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,252 @@
+# Reusable GitHub Actions workflow for quality gates jobs (converted from jobs.qualityGates.yml)
+# Variable names and logic preserved as much as possible
+name: quality-gates
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_UNIT_TEST_IMAGE:
+        required: false
+        type: string
+        default: "mcr.microsoft.com/dotnet/sdk:7.0"
+      TMPL_SONAR_IMAGE:
+        required: false
+        type: string
+        default: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-7.0"
+      TMPL_SONAR_REPORT_FILE:
+        required: false
+        type: string
+        default: "./coverage/lcov.info"
+      TMPL_SONAR_SOURCES:
+        required: false
+        type: string
+        default: "."
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS_NODEJS:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE_SONARQUBE:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS:
+        required: false
+        type: string
+      PROJ_SOLUTION_NAME:
+        required: false
+        type: string
+      PROJ_TEST_DIRECTORY:
+        required: false
+        type: string
+      PROJ_SERVICE_NAME:
+        required: false
+        type: string
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets:
+      SCRT_SONAR_LOGIN_INBCU:
+        required: false
+      SCRT_NPMRC_TOKEN:
+        required: false
+      UNIT_TEST_DOTENV:
+        required: false
+
+jobs:
+  # Unit Test (.NET)
+  unit_test_dotnet:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1' &&
+      (inputs.CI_COMMIT_BRANCH != '' || inputs.CI_MERGE_REQUEST_ID != '')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for test projects
+        id: check_tests
+        run: |
+          if find . -name "*[Tt]ests.csproj" -type f | grep -q .; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run .NET Unit Tests
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: |
+          apt-get update
+          dotnet restore ./${{ inputs.PROJ_SOLUTION_NAME }}.sln
+          echo "Running unit tests..."
+          dotnet test ./${{ inputs.PROJ_SOLUTION_NAME }}.sln \
+              --test-adapter-path:. \
+              --logger:"junit;LogFilePath=../reports/unit/{assembly}-unitTest-results.xml;MethodFormat=Class;FailureBodyFormat=Verbose" \
+              --collect:"XPlat Code Coverage" \
+              --results-directory ./reports/coverage
+          
+          dotnet tool install dotnet-reportgenerator-globaltool --tool-path tools
+          ./tools/reportgenerator "-reports:./reports/**/coverage.cobertura.xml" "-targetdir:reports/coverage" "-reporttypes:TextSummary"
+          cat ./reports/coverage/Summary.txt
+
+      - name: Upload test results
+        if: steps.check_tests.outputs.has_tests == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: |
+            **/*unitTest-results.xml
+            **/coverage.cobertura.xml
+
+  # Unit Test (NodeJS)
+  unit_test_nodejs:
+    runs-on: ubuntu-latest
+    container:
+      image: node:18
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS_NODEJS != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1' &&
+      (inputs.CI_COMMIT_BRANCH != '' || inputs.CI_MERGE_REQUEST_ID != '')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for NodeJS test files
+        id: check_tests
+        run: |
+          if find . \( -name "*[Tt]est.ts" -o -name "*[Ss]pec.ts" \) -type f | grep -q .; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup test environment
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: |
+          # Setup npmrc token if available
+          if [ -n "${{ secrets.SCRT_NPMRC_TOKEN }}" ]; then
+            echo "${{ secrets.SCRT_NPMRC_TOKEN }}" > .npmrc
+          fi
+          # Setup environment file if available
+          if [ -n "${{ secrets.UNIT_TEST_DOTENV }}" ]; then
+            echo "${{ secrets.UNIT_TEST_DOTENV }}" > ./.env
+          fi
+
+      - name: Install dependencies and run tests
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: |
+          echo "Installing dependencies..."
+          npm ci
+          echo "Running unit tests..."
+          npm run test
+
+      - name: Upload test results
+        if: steps.check_tests.outputs.has_tests == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nodejs-test-results
+          path: ./reports/junit.xml
+
+  # SonarQube (.NET)
+  sonarqube_dotnet:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.TMPL_SONAR_IMAGE }}
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_SONARQUBE != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1' &&
+      (inputs.CI_COMMIT_BRANCH != '' || inputs.CI_MERGE_REQUEST_ID != '')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for test projects
+        id: check_tests
+        run: |
+          if find . -name "*[Tt]ests.csproj" -type f | grep -q .; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run SonarQube analysis for .NET
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: |
+          sed -i '1,2.0.0/s/1.2.0.0/$COVERLET_VERSION/' /var/runsetting
+          dotnet restore ./${{ inputs.PROJ_SOLUTION_NAME }}.sln
+          dotnet sonarscanner begin /k:"${{ inputs.PROJ_SOLUTION_NAME }}" /n:"${{ inputs.PROJ_SOLUTION_NAME }}" /v:"$BUILDNUMBER" /d:sonar.login="${{ secrets.SCRT_SONAR_LOGIN_INBCU }}" /d:sonar.host.url="https://sonar.inbcu.com" /d:sonar.coverageReportPaths="SonarQube.xml"
+          dotnet build ./${{ inputs.PROJ_SOLUTION_NAME }}.sln
+          dotnet test ./${{ inputs.PROJ_TEST_DIRECTORY }} --settings /var/runsetting
+          reportgenerator -reports:./${{ inputs.PROJ_TEST_DIRECTORY }}/TestResults/*/coverage.cobertura.xml -targetdir:. -reporttypes:SonarQube
+          cp SonarQube.xml ./${{ inputs.PROJ_TEST_DIRECTORY }}/SonarQube.xml
+          cp SonarQube.xml ./${{ inputs.PROJ_SOLUTION_NAME }}/SonarQube.xml
+          dotnet sonarscanner end /d:sonar.login="${{ secrets.SCRT_SONAR_LOGIN_INBCU }}"
+        env:
+          BUILDNUMBER: ${{ github.run_number }}
+
+  # SonarQube (NodeJS)
+  sonarqube_nodejs:
+    runs-on: ubuntu-latest
+    container:
+      image: harbor.use.ucdp.net/upto_common/upr-sonarqube-image:16
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_SONARQUBE != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1' &&
+      (inputs.CI_COMMIT_BRANCH != '' || inputs.CI_MERGE_REQUEST_ID != '')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for NodeJS test files
+        id: check_tests
+        run: |
+          if find . \( -name "*[Tt]est.ts" -o -name "*[Ss]pec.ts" \) -type f | grep -q .; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup and run SonarQube analysis for NodeJS
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: |
+          # Setup npmrc token if available
+          if [ -n "${{ secrets.SCRT_NPMRC_TOKEN }}" ]; then
+            echo "${{ secrets.SCRT_NPMRC_TOKEN }}" > .npmrc
+          fi
+          # Setup environment file if available
+          if [ -n "${{ secrets.UNIT_TEST_DOTENV }}" ]; then
+            echo "${{ secrets.UNIT_TEST_DOTENV }}" > ./.env
+          fi
+          
+          npm ci
+          npm run test
+          
+          export SONAR_SCANNER_OPTS="${SONAR_SCANNER_OPTS} -Dsonar.login=${{ secrets.SCRT_SONAR_LOGIN_INBCU }}
+          -Dsonar.projectKey=${{ inputs.PROJ_SERVICE_NAME }}
+          -Dsonar.projectName=${{ inputs.PROJ_SERVICE_NAME }}
+          -Dsonar.projectVersion=${{ github.run_number }}
+          -Dsonar.pullrequest.branch=${{ github.head_ref }}
+          -Dsonar.pullrequest.base=${{ github.base_ref }}
+          -Dsonar.pullrequest.key=${{ github.event.number }}
+          -Dsonar.scm.revision=${{ github.event.pull_request.base.sha }}
+          -Dsonar.sources=${{ inputs.TMPL_SONAR_SOURCES }}
+          -Dsonar.typescript.lcov.reportPaths=${{ inputs.TMPL_SONAR_REPORT_FILE }}
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.tests="
+          
+          sonar-scanner

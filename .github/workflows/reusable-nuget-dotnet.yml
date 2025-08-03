@@ -1,0 +1,91 @@
+# Reusable GitHub Actions workflow for .NET NuGet packages (converted from nuget.gitlab-ci.yml)
+# Variable names and logic preserved as much as possible
+name: nuget-dotnet
+
+on:
+  workflow_call:
+    inputs:
+      SOLUTION_NAME:
+        required: true
+        type: string
+      PROJ_NUGET_PACKAGE_NAME:
+        required: true
+        type: string
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets:
+      SCRT_GITLAB_API_PRIVATE_TOKEN:
+        required: true
+
+jobs:
+  semver:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:7.0
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        run: |
+          # Equivalent to dotnet /app/gitlab-semver-helper.dll command
+          # This would need to be replaced with appropriate semver logic
+          echo "Generating semantic version..."
+          VERSION="1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "$VERSION" > ./version.txt
+          cat ./version.txt
+
+  build_nuget:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:7.0
+    needs: semver
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH) || contains(github.ref, 'hotfix') || contains(github.ref, 'release') || github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore version file
+        run: echo "${{ needs.semver.outputs.version }}" > ./version.txt
+
+      - name: Build
+        run: |
+          VERSION=$(cat ./version.txt | sed 's/^v//')
+          dotnet build
+        env:
+          VERSION: ${{ needs.semver.outputs.version }}
+
+  publish_nexus:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:7.0
+    needs: [semver, build_nuget]
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH) || contains(github.ref, 'hotfix') || contains(github.ref, 'feature')
+    environment: nexus-publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore version file
+        run: echo "${{ needs.semver.outputs.version }}" > ./version.txt
+
+      - name: Build and publish to Nexus
+        run: |
+          VERSION=$(cat ./version.txt | sed 's/^v//')
+          echo "Publishing version: $VERSION"
+          dotnet build -p:Version=$VERSION -c Release -o ./output/ ${{ inputs.SOLUTION_NAME }}.sln
+          # NuGet push command would need proper Nexus configuration
+          # nuget push ./output/${{ inputs.PROJ_NUGET_PACKAGE_NAME }}.$VERSION.nupkg -Source Nexus
+        env:
+          VERSION: ${{ needs.semver.outputs.version }}

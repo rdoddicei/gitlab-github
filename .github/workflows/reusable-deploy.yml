@@ -1,0 +1,170 @@
+# Reusable GitHub Actions workflow for deploy jobs (converted from jobs.deploy.yml)
+# Variable names and logic preserved as much as possible
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_IS_CRON:
+        required: false
+        type: string
+      TMPL_HELM_ARGS:
+        required: false
+        type: string
+      TMPL_RUNNER_TAG:
+        required: false
+        type: string
+        default: "docker"
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets:
+      SCRT_NONPROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_USH:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1360_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B551:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B551_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_EASTUS_AKS:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_JAPANEAST:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_EASTUS_AWS:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_USH:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1360_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B551:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B551_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_JAPANEAST:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_EASTUS_AKS:
+        required: false
+
+jobs:
+  # Feature Deployments to DEV Environment
+  deploy_feature_uo_dev:
+    runs-on: ubuntu-latest
+    if: contains(inputs.CI_COMMIT_BRANCH, 'feature')
+    environment: dev-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy Feature to UO-DEV
+        run: |
+          echo "Deploying feature branch to UO DEV environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_feature_uo_pci_dev:
+    runs-on: ubuntu-latest
+    if: contains(inputs.CI_COMMIT_BRANCH, 'feature')
+    environment: dev-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy Feature to UO-PCI-DEV
+        run: |
+          echo "Deploying feature branch to UO PCI DEV environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+          TMPL_RUNNER_TAG: docker-pci
+
+  # DEV Environment Deployments
+  deploy_uo_dev:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: dev-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-DEV
+        run: |
+          echo "Deploying to UO DEV environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_uo_pci_dev:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: dev-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PCI-DEV
+        run: |
+          echo "Deploying to UO PCI DEV environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_DATACENTER: uo-pci
+          TMPL_ENVIRONMENT_NAME: dev
+          TMPL_RUNNER_TAG: docker-pci
+
+  # QA Environment Deployments
+  deploy_uo_qa:
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'release') || contains(github.ref, 'hotfix')
+    environment: qa-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-QA
+        run: |
+          echo "Deploying to UO QA environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: qa
+
+  # PROD Environment Deployments
+  deploy_uo_prod:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: prod-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PROD
+        run: |
+          echo "Deploying to UO PROD environment"
+          # Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1A }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: prod

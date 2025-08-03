@@ -1,0 +1,245 @@
+# Reusable GitHub Actions workflow for multi-cluster deploy jobs (converted from jobs.multiClusterDeploy.yml)
+# Variable names and logic preserved as much as possible
+name: multi-cluster-deploy
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_RUNNER_TAG:
+        required: false
+        type: string
+        default: "docker"
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets:
+      SCRT_NONPROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_PCI_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_PCI_RKE2:
+        required: false
+
+jobs:
+  # Feature Deployments to DEV Environment
+  deploy_feature_uo_dev:
+    runs-on: ubuntu-latest
+    if: contains(inputs.CI_COMMIT_BRANCH, 'feature')
+    environment: dev-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy Feature to UO-DEV Multi-Cluster
+        run: |
+          echo "Deploying feature branch to UO DEV multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_feature_uo_pci_dev:
+    runs-on: ubuntu-latest
+    if: contains(inputs.CI_COMMIT_BRANCH, 'feature')
+    environment: dev-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy Feature to UO-PCI-DEV Multi-Cluster
+        run: |
+          echo "Deploying feature branch to UO PCI DEV multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI }}
+          TMPL_DATACENTER: uo-pci
+          TMPL_ENVIRONMENT_NAME: dev
+          TMPL_RUNNER_TAG: docker-pci
+
+  # DEV Environment Deployments
+  deploy_uo_dev:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: dev-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-DEV Multi-Cluster
+        run: |
+          echo "Deploying to UO DEV multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_uo_pci_dev:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: dev-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PCI-DEV Multi-Cluster
+        run: |
+          echo "Deploying to UO PCI DEV multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI }}
+          TMPL_DATACENTER: uo-pci
+          TMPL_ENVIRONMENT_NAME: dev
+          TMPL_RUNNER_TAG: docker-pci
+
+  # QA Environment Deployments
+  deploy_uo_qa:
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'release') || contains(github.ref, 'hotfix')
+    environment: qa-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-QA Multi-Cluster
+        run: |
+          echo "Deploying to UO QA multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: qa
+
+  deploy_uo_pci_qa:
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'release') || contains(github.ref, 'hotfix')
+    environment: qa-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PCI-QA Multi-Cluster
+        run: |
+          echo "Deploying to UO PCI QA multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI }}
+          TMPL_DATACENTER: uo-pci
+          TMPL_ENVIRONMENT_NAME: qa
+          TMPL_RUNNER_TAG: docker-pci
+
+  # Production Environment Deployments
+  deploy_uo_prod:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: prod-uo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PROD Multi-Cluster
+        run: |
+          echo "Deploying to UO PROD multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1A }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1S3 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: prod
+
+  deploy_uo_pci_prod:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: prod-uo-pci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PCI-PROD Multi-Cluster
+        run: |
+          echo "Deploying to UO PCI PROD multi-cluster environment"
+          # Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1A_PCI }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1S3_PCI }}
+          TMPL_DATACENTER: uo-pci
+          TMPL_ENVIRONMENT_NAME: prod
+          TMPL_RUNNER_TAG: docker-pci
+
+  # RKE2 Environment Deployments
+  # Feature Branches to DEV
+  deploy_feature_rke2_uo_dev:
+    runs-on: ubuntu-latest
+    if: contains(inputs.CI_COMMIT_BRANCH, 'feature')
+    environment: dev-uo-rke2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy Feature to UO-DEV RKE2 Multi-Cluster
+        run: |
+          echo "Deploying feature branch to UO DEV RKE2 multi-cluster environment"
+          # RKE2 Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2 }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_NONPROD_KUBE_CONFIG_B1S3_RKE2 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: dev
+
+  # RKE2 Production Environment Deployments
+  deploy_rke2_uo_prod:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', inputs.CI_DEFAULT_BRANCH)
+    environment: prod-uo-rke2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy to UO-PROD RKE2 Multi-Cluster
+        run: |
+          echo "Deploying to UO PROD RKE2 multi-cluster environment"
+          # RKE2 Multi-cluster Kubernetes deployment logic would go here
+        env:
+          TMPL_KUBE_CONFIG_B1A: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1A_RKE2 }}
+          TMPL_KUBE_CONFIG_B1S3: ${{ secrets.SCRT_PROD_KUBE_CONFIG_B1S3_RKE2 }}
+          TMPL_DATACENTER: uo
+          TMPL_ENVIRONMENT_NAME: prod

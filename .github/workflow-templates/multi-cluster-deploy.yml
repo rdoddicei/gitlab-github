@@ -1,0 +1,58 @@
+# Reusable GitHub Actions workflow for multi-cluster deploy (converted from jobs.multiClusterDeploy.yml)
+# Variable names and logic preserved as much as possible
+name: multi-cluster-deploy
+
+on:
+  workflow_call:
+    inputs:
+      SCRT_NONPROD_KUBE_CONFIG_B1A:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1S3:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI:
+        required: false
+        type: string
+      TMPL_RUNNER_TAG:
+        required: false
+        type: string
+    secrets: {}
+
+jobs:
+  deploy_feature_uo_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG_B1A: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+      TMPL_KUBE_CONFIG_B1S3: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1S3 }}
+      TMPL_DATACENTER: uo
+      TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_feature_uo_pci_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG_B1A: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+      TMPL_KUBE_CONFIG_B1S3: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI }}
+      TMPL_DATACENTER: uo-pci
+      TMPL_ENVIRONMENT_NAME: dev
+      TMPL_RUNNER_TAG: docker-pci
+
+  deploy_uo_dev:
+    uses: ./.github/workflow-templates/deploy-development-template.yml
+    with:
+      TMPL_KUBE_CONFIG_B1A: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+      TMPL_KUBE_CONFIG_B1S3: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1S3 }}
+      TMPL_DATACENTER: uo
+      TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_uo_pci_dev:
+    uses: ./.github/workflow-templates/deploy-development-template.yml
+    with:
+      TMPL_KUBE_CONFIG_B1A: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+      TMPL_KUBE_CONFIG_B1S3: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI }}
+      TMPL_DATACENTER: uo-pci
+      TMPL_ENVIRONMENT_NAME: dev
+      TMPL_RUNNER_TAG: docker-pci

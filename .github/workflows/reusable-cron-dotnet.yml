@@ -1,0 +1,67 @@
+# Reusable GitHub Actions workflow for .NET cron jobs (converted from cron.gitlab-ci.yml)
+# Variable names and logic preserved as much as possible
+name: cron-dotnet
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_IS_CRON:
+        required: false
+        type: string
+        default: "true"
+      TMPL_UNIT_TEST_IMAGE:
+        required: false
+        type: string
+        default: "mcr.microsoft.com/dotnet/sdk:7.0"
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS:
+        required: false
+        type: string
+        default: "1"
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS:
+        required: false
+        type: string
+        default: "1"
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets:
+      SCRT_GITLAB_API_PRIVATE_TOKEN:
+        required: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
+
+  deploy:
+    needs: build
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      TMPL_IS_CRON: ${{ inputs.TMPL_IS_CRON }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
+
+  quality-gates:
+    needs: build
+    uses: ./.github/workflows/reusable-quality-gates.yml
+    with:
+      TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS }}
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit

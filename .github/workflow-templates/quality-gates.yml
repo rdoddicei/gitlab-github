@@ -1,0 +1,47 @@
+# Reusable GitHub Actions workflow for quality gates (converted from jobs.qualityGates.yml)
+# Variable names and logic preserved as much as possible
+name: quality-gates
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_SONAR_REPORT_FILE:
+        required: false
+        type: string
+      TMPL_SONAR_SOURCES:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET:
+        required: false
+        type: string
+      DEVOPS_QG_OVERRIDE:
+        required: false
+        type: string
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+    secrets: {}
+
+jobs:
+  unit_test_dotnet:
+    uses: ./.github/workflow-templates/unit-test-template.yml
+    with:
+      TMPL_SONAR_REPORT_FILE: ${{ inputs.TMPL_SONAR_REPORT_FILE }}
+      TMPL_SONAR_SOURCES: ${{ inputs.TMPL_SONAR_SOURCES }}
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET: ${{ inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET }}
+      DEVOPS_QG_OVERRIDE: ${{ inputs.DEVOPS_QG_OVERRIDE }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+
+  unit_test_nodejs:
+    uses: ./.github/workflow-templates/unit-test-template.yml
+    with:
+      TMPL_SONAR_REPORT_FILE: ${{ inputs.TMPL_SONAR_REPORT_FILE }}
+      TMPL_SONAR_SOURCES: ${{ inputs.TMPL_SONAR_SOURCES }}
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET: ${{ inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS_DOTNET }}
+      DEVOPS_QG_OVERRIDE: ${{ inputs.DEVOPS_QG_OVERRIDE }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}

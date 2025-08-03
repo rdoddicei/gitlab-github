@@ -1,0 +1,82 @@
+# Reusable GitHub Actions workflow for deploying (converted from jobs.deploy.yml)
+# Variable names and logic preserved as much as possible
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      TMPL_KUBE_CONFIG_B1A:
+        required: false
+        type: string
+      TMPL_KUBE_CONFIG_B135:
+        required: false
+        type: string
+      TMPL_KUBE_CONFIG_B1A_PCI:
+        required: false
+        type: string
+      TMPL_KUBE_CONFIG_B135_PCI:
+        required: false
+        type: string
+      TMPL_KUBE_CONFIG_B1360_PCI:
+        required: false
+        type: string
+      TMPL_KUBE_CONFIG_B551:
+        required: false
+        type: string
+      TMPL_RUNNER_TAG:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1A:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_USH:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B1360_PCI:
+        required: false
+        type: string
+      SCRT_NONPROD_KUBE_CONFIG_B551:
+        required: false
+        type: string
+    secrets: {}
+
+jobs:
+  deploy_feature_uo_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A }}
+      TMPL_DATACENTER: uo
+      TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_feature_uo_pci_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1A_PCI }}
+      TMPL_DATACENTER: uo
+      TMPL_ENVIRONMENT_NAME: dev
+      TMPL_RUNNER_TAG: docker-pci
+
+  deploy_feature_ush_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_USH }}
+      TMPL_DATACENTER: ush
+      TMPL_ENVIRONMENT_NAME: dev
+
+  deploy_feature_ush_pci_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B1360_PCI }}
+      TMPL_DATACENTER: ush-pci
+      TMPL_ENVIRONMENT_NAME: dev
+      TMPL_RUNNER_TAG: docker-pci
+
+  deploy_feature_usj_dev:
+    uses: ./.github/workflow-templates/deploy-feature-template.yml
+    with:
+      TMPL_KUBE_CONFIG: ${{ inputs.SCRT_NONPROD_KUBE_CONFIG_B551 }}
+      TMPL_DATACENTER: usj
+      TMPL_ENVIRONMENT_NAME: dev

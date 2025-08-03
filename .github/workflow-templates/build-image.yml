@@ -1,0 +1,48 @@
+# Reusable GitHub Actions workflow for building images (converted from jobs.build.yml)
+# Variable names and logic preserved as much as possible
+name: build-image
+
+on:
+  workflow_call:
+    inputs:
+      CI_MERGE_REQUEST_ID:
+        required: false
+        type: string
+      CI_COMMIT_BRANCH:
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        required: false
+        type: string
+    secrets: {}
+
+jobs:
+  semver:
+    uses: ./.github/workflow-templates/semver-template.yml
+    with:
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+
+  build_image:
+    uses: ./.github/workflow-templates/build-image-template.yml
+    with:
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+
+  build_image_mr:
+    if: ${{ inputs.CI_MERGE_REQUEST_ID != '' }}
+    uses: ./.github/workflow-templates/build-image-no-push-template.yml
+    with:
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+
+  build_image_branch:
+    if: ${{ inputs.CI_COMMIT_BRANCH != '' }}
+    uses: ./.github/workflow-templates/build-image-no-push-template.yml
+    with:
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
