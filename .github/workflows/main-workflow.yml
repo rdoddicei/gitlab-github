@@ -6,6 +6,7 @@ name: Main CI/CD Pipeline
 on:
   push:
     branches:
+      - gh-gl-mig
       - main
       - develop
       - 'feature/**'
@@ -13,6 +14,7 @@ on:
       - 'release/**'
   pull_request:
     branches:
+      - gh-gl-mig
       - main
       - develop
   schedule:
@@ -22,7 +24,7 @@ on:
 # Global environment variables
 env:
   CI_COMMIT_BRANCH: ${{ github.ref_name }}
-  CI_DEFAULT_BRANCH: main
+  CI_DEFAULT_BRANCH: gh-gl-mig
   CI_MERGE_REQUEST_ID: ${{ github.event.number }}
 
 jobs:
@@ -44,38 +46,67 @@ jobs:
       - name: Detect project characteristics
         id: detect
         run: |
+          echo "🔍 Starting project detection..."
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+          
+          # Initialize all outputs as false
+          echo "is_dotnet_service=false" >> $GITHUB_OUTPUT
+          echo "is_dotnet_processor=false" >> $GITHUB_OUTPUT
+          echo "is_dotnet_cron=false" >> $GITHUB_OUTPUT
+          echo "is_nuget_project=false" >> $GITHUB_OUTPUT
+          echo "has_dockerfile=false" >> $GITHUB_OUTPUT
+          echo "run_generic_build=false" >> $GITHUB_OUTPUT
+          
           # Check for .NET solution files
           if ls *.sln 1> /dev/null 2>&1; then
             SOLUTION_NAME=$(ls *.sln | head -1 | sed 's/.sln$//')
             echo "solution_name=$SOLUTION_NAME" >> $GITHUB_OUTPUT
-            echo "Found solution: $SOLUTION_NAME"
+            echo "✅ Found solution: $SOLUTION_NAME"
+          else
+            echo "solution_name=" >> $GITHUB_OUTPUT
+            echo "ℹ️  No .sln files found"
           fi
           
           # Check for specific project indicators
           if [ -f "Dockerfile" ]; then
             echo "has_dockerfile=true" >> $GITHUB_OUTPUT
+            echo "✅ Found Dockerfile"
+          else
+            echo "ℹ️  No Dockerfile found"
           fi
+          
+          # Look for project files
+          CSPROJ_COUNT=$(find . -name "*.csproj" | wc -l)
+          echo "📁 Found $CSPROJ_COUNT .csproj files"
           
           # Detect project type based on patterns
           if grep -r "Microsoft.AspNetCore" . --include="*.csproj" 2>/dev/null | grep -q .; then
             echo "is_dotnet_service=true" >> $GITHUB_OUTPUT
-            echo "Detected: .NET Service project"
+            echo "🌐 Detected: .NET Service project (AspNetCore found)"
           elif grep -r "Microsoft.Extensions.Hosting" . --include="*.csproj" 2>/dev/null | grep -q .; then
             if [ "${{ github.event_name }}" = "schedule" ]; then
               echo "is_dotnet_cron=true" >> $GITHUB_OUTPUT
-              echo "Detected: .NET Cron project"
+              echo "⏰ Detected: .NET Cron project (scheduled execution)"
             else
               echo "is_dotnet_processor=true" >> $GITHUB_OUTPUT
-              echo "Detected: .NET Processor project"
+              echo "⚙️  Detected: .NET Processor project (Extensions.Hosting found)"
             fi
           elif find . -name "*.nupkg" -o -name "*.nuspec" | grep -q .; then
             echo "is_nuget_project=true" >> $GITHUB_OUTPUT
-            echo "Detected: NuGet package project"
+            echo "📦 Detected: NuGet package project"
+          elif [ "$CSPROJ_COUNT" -gt 0 ] || [ -f "Dockerfile" ]; then
+            echo "run_generic_build=true" >> $GITHUB_OUTPUT
+            echo "🔧 Will run generic build (found .csproj or Dockerfile)"
+          else
+            echo "❌ No recognizable project type detected"
           fi
           
           # Set project name
           PROJECT_NAME=${GITHUB_REPOSITORY##*/}
           echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+          echo "📝 Project name: $PROJECT_NAME"
 
   # .NET Service Pipeline
   dotnet-service-pipeline:
@@ -86,7 +117,7 @@ jobs:
       TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:7.0"
       TMPL_SONAR_IMAGE: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-7.0"
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
-      CI_DEFAULT_BRANCH: "main"
+      CI_DEFAULT_BRANCH: "gh-gl-mig"
       CI_MERGE_REQUEST_ID: ${{ github.event.number }}
     secrets: inherit
 
@@ -102,7 +133,7 @@ jobs:
       DEVOPS_QG_OVERRIDE_SMOKE_TESTS: "1"
       DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: "1"
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
-      CI_DEFAULT_BRANCH: "main"
+      CI_DEFAULT_BRANCH: "gh-gl-mig"
       CI_MERGE_REQUEST_ID: ${{ github.event.number }}
     secrets: inherit
 
@@ -117,7 +148,7 @@ jobs:
       DEVOPS_QG_OVERRIDE_SMOKE_TESTS: "1"
       DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: "1"
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
-      CI_DEFAULT_BRANCH: "main"
+      CI_DEFAULT_BRANCH: "gh-gl-mig"
       CI_MERGE_REQUEST_ID: ${{ github.event.number }}
     secrets: inherit
 
@@ -130,7 +161,7 @@ jobs:
       SOLUTION_NAME: ${{ needs.detect-project-type.outputs.solution_name || 'Solution' }}
       PROJ_NUGET_PACKAGE_NAME: ${{ needs.detect-project-type.outputs.project_name }}
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
-      CI_DEFAULT_BRANCH: "main"
+      CI_DEFAULT_BRANCH: "gh-gl-mig"
       CI_MERGE_REQUEST_ID: ${{ github.event.number }}
     secrets: inherit
 
@@ -146,7 +177,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
-      CI_DEFAULT_BRANCH: "main"
+      CI_DEFAULT_BRANCH: "gh-gl-mig"
       CI_MERGE_REQUEST_ID: ${{ github.event.number }}
     secrets: inherit
 
