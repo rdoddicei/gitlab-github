@@ -1,0 +1,307 @@
+# Reusable GitHub Actions workflow templates (converted from templates.yml)
+# This provides common functionality that was defined in GitLab CI templates
+name: templates
+
+on:
+  workflow_call:
+    inputs:
+      PROJ_SERVICE_NAME:
+        required: true
+        type: string
+      PROJ_HARBOR_DIRECTORY:
+        required: true
+        type: string
+      PROJ_IMAGE_NAME:
+        required: true
+        type: string
+      PROJ_K8S_NAMESPACE_BASE:
+        required: true
+        type: string
+      TMPL_DOCKER_REPO:
+        required: false
+        type: string
+        default: "harbor.use.ucdp.net"
+      TMPL_HELM:
+        required: false
+        type: string
+        default: "oci://harbor.use.ucdp.net/udx-devops/helm-udx-deployment"
+      TMPL_CRON_HELM:
+        required: false
+        type: string
+        default: "oci://harbor.use.ucdp.net/udx-devops/helm-udx-cronjob"
+      TMPL_DOCKER_FILE_PATH:
+        required: false
+        type: string
+        default: "Dockerfile"
+      TMPL_DEPLOYMENT_TIMEOUT:
+        required: false
+        type: string
+        default: "180s"
+      TMPL_DOCKER_PATH:
+        required: false
+        type: string
+        default: "."
+      TMPL_IS_CRON:
+        required: false
+        type: string
+      CI_ENVIRONMENT_NAME:
+        required: false
+        type: string
+      SEMVER:
+        required: false
+        type: string
+    secrets:
+      SCRT_HARBOR_USERNAME:
+        required: true
+      SCRT_HARBOR_PASSWORD:
+        required: true
+      SCRT_DEVOPS_HARBOR_AUTH_USER:
+        required: true
+      SCRT_DEVOPS_HARBOR_AUTH_PASS:
+        required: true
+      SCRT_NPMRC_TOKEN:
+        required: false
+      SECRETS:
+        required: false
+      PARAMS:
+        required: false
+
+env:
+  # Template Variables (preserving original names)
+  TMPL_DOCKER_REPO: ${{ inputs.TMPL_DOCKER_REPO }}
+  TMPL_HELM: ${{ inputs.TMPL_HELM }}
+  TMPL_CRON_HELM: ${{ inputs.TMPL_CRON_HELM }}
+  TMPL_DOCKER_FILE_PATH: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+  TMPL_DEPLOYMENT_TIMEOUT: ${{ inputs.TMPL_DEPLOYMENT_TIMEOUT }}
+  TMPL_PACKAGEJSON_PATH: ./package.json
+  TMPL_DOCKER_PATH: ${{ inputs.TMPL_DOCKER_PATH }}
+  
+  # .NET Project Variables
+  PROJ_DOTNET_APPSETTINGS_PATH: ./**
+  
+  # Quality Gates
+  TMPL_TEST_NGINX_BASE: /opt/rh/nginx16/root/usr/share/nginx/DEVhtml
+  TMPL_QA_TEST_DIRECTORY: qatests
+  
+  # Images
+  TMPL_SEMVER_IMAGE: harbor.use.ucdp.net/upto_common/gitlab-semver-helper:latest
+  TMPL_KUBECTL_IMAGE: harbor.use.ucdp.net/upto_common/kubectl-image
+
+jobs:
+  # DevOps Watermark (informational job)
+  devops-watermark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display DevOps Information
+        run: |
+          echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+          echo -e "#"
+          echo -e "# \e[93mThis pipeline is owned and supported by the UDX DevOps team."
+          echo -e "# \e[93mFor any questions, please contact us using the information below."
+          echo -e "#"
+          echo -e "# \e[93mEmail - DevOps Technology Services <devops@universalorlando.com>"
+          echo -e "# \e[93mTeams Channel - https://teams.microsoft.com/l/channel/19%3ab7f685a70ffa4e6b97fcea001ea5cbba%40thread.tacv2/General?groupId=2b8cd482-1644-4e1f-9140-7f5439174a1d&tenantId=8e630190-cd38-4a28-b5f6-eb20ebf05f29"
+          echo -e "#"
+          echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+  # Semantic Versioning
+  semver:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ env.TMPL_SEMVER_IMAGE }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: DevOps Watermark
+        run: |
+          echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+          echo -e "# \e[93mGenerating semantic version..."
+          echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+      - name: Generate semantic version
+        id: version
+        run: |
+          # Note: In actual implementation, this would use the GitLab semver helper
+          # For now, using GitHub run number as version
+          VERSION="1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "SEMVER=$VERSION" >> $GITHUB_ENV
+          echo "$VERSION" > ./version.txt
+          echo "Generated version: $VERSION"
+
+      - name: Upload version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version.txt
+
+  # Build Docker Image Template
+  build-image:
+    runs-on: ubuntu-latest
+    needs: semver
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+
+      - name: Set version
+        run: |
+          SEMVER=$(cat version.txt)
+          echo "SEMVER=$SEMVER" >> $GITHUB_ENV
+
+      - name: DevOps Watermark
+        run: |
+          echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+          echo -e "# \e[93mBuilding Docker image..."
+          echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+      - name: Setup NPM if needed
+        run: |
+          if [[ -f "${{ secrets.SCRT_NPMRC_TOKEN }}" && -f "${{ env.TMPL_PACKAGEJSON_PATH }}" ]]; then
+            echo "Setting up NPM configuration..."
+            echo "${{ secrets.SCRT_NPMRC_TOKEN }}" > .npmrc
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Harbor Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.TMPL_DOCKER_REPO }}
+          username: ${{ secrets.SCRT_HARBOR_USERNAME }}
+          password: ${{ secrets.SCRT_HARBOR_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          SEMVER=$SEMVER$TMPL_VERSION_SUFFIX
+          echo "Build Version - $SEMVER"
+          echo -e "\e[0Ksection_start:`date +%s`:docker_build_section[collapsed=true]\r\e[0KBuild Docker Image..."
+          
+          docker build $TMPL_DOCKER_BUILD_ARGS \
+            -t ${{ env.TMPL_DOCKER_REPO }}/${{ inputs.PROJ_HARBOR_DIRECTORY }}/${{ inputs.PROJ_IMAGE_NAME }}:$SEMVER \
+            -f ${{ env.TMPL_DOCKER_FILE_PATH }} ${{ env.TMPL_DOCKER_PATH }}
+          
+          echo -e "\e[0Ksection_end:`date +%s`:docker_build_section\r\e[0K"
+          
+          docker tag ${{ env.TMPL_DOCKER_REPO }}/${{ inputs.PROJ_HARBOR_DIRECTORY }}/${{ inputs.PROJ_IMAGE_NAME }}:$SEMVER \
+            ${{ env.TMPL_DOCKER_REPO }}/${{ inputs.PROJ_HARBOR_DIRECTORY }}/${{ inputs.PROJ_IMAGE_NAME }}:latest$TMPL_VERSION_SUFFIX
+          
+          docker push ${{ env.TMPL_DOCKER_REPO }}/${{ inputs.PROJ_HARBOR_DIRECTORY }}/${{ inputs.PROJ_IMAGE_NAME }}:$SEMVER
+          docker push ${{ env.TMPL_DOCKER_REPO }}/${{ inputs.PROJ_HARBOR_DIRECTORY }}/${{ inputs.PROJ_IMAGE_NAME }}:latest$TMPL_VERSION_SUFFIX
+
+  # Build Docker Image (No Push) Template
+  build-image-no-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: DevOps Watermark
+        run: |
+          echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+          echo -e "# \e[93mBuilding Docker image (no push)..."
+          echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+      - name: Setup NPM if needed
+        run: |
+          if [[ -f "${{ secrets.SCRT_NPMRC_TOKEN }}" && -f "${{ env.TMPL_PACKAGEJSON_PATH }}" ]]; then
+            echo "Setting up NPM configuration..."
+            echo "${{ secrets.SCRT_NPMRC_TOKEN }}" > .npmrc
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (no push)
+        run: |
+          docker build $TMPL_DOCKER_BUILD_ARGS \
+            -t ${{ inputs.PROJ_SERVICE_NAME }}:${{ github.ref_name }} \
+            -f ${{ env.TMPL_DOCKER_FILE_PATH }} ${{ env.TMPL_DOCKER_PATH }}
+
+  # Deployment Template
+  deploy-cluster:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ env.TMPL_KUBECTL_IMAGE }}
+    needs: [semver, build-image]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+
+      - name: Set version
+        run: |
+          SEMVER=$(cat version.txt)
+          echo "SEMVER=$SEMVER" >> $GITHUB_ENV
+
+      - name: DevOps Watermark
+        run: |
+          echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+          echo -e "# \e[93mDeploying to Kubernetes..."
+          echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+      - name: Configure Helm and Deploy
+        run: |
+          SEMVER=$SEMVER${TMPL_VERSION_SUFFIX}
+          CI_ENVIRONMENT_NAME="${{ inputs.CI_ENVIRONMENT_NAME }}"
+          CI_ENVIRONMENT_NAME="${CI_ENVIRONMENT_NAME##*uo-}"
+          CI_ENVIRONMENT_NAME="${CI_ENVIRONMENT_NAME##*pci-}"
+          
+          if [ "${{ inputs.TMPL_IS_CRON }}" ]; then 
+            TMPL_HELM=${{ env.TMPL_CRON_HELM }}
+          else
+            TMPL_HELM=${{ env.TMPL_HELM }}
+          fi
+          
+          echo -e "\e[96mDeploying Build Version ${SEMVER} in the ${CI_ENVIRONMENT_NAME} environment..."
+          echo -e "\e[0Ksection_start:`date +%s`:helm_configuration_section[collapsed=true]\r\e[0KConfiguring Helm Charts..."
+          
+          # Login to Harbor registry
+          helm registry login --username ${{ secrets.SCRT_DEVOPS_HARBOR_AUTH_USER }} \
+            --password ${{ secrets.SCRT_DEVOPS_HARBOR_AUTH_PASS }} harbor.use.ucdp.net
+          
+          # Pull Helm chart
+          helm pull oci://harbor.use.ucdp.net/udx-devops/helm-udx-deployment
+          helm dependency build $TMPL_HELM || true
+          
+          # Create empty files if secrets/params don't exist
+          if [ ! -f "${{ secrets.SECRETS }}" ]; then 
+            touch secrets.yaml && SECRETS=./secrets.yaml
+          else
+            SECRETS="${{ secrets.SECRETS }}"
+          fi
+          
+          if [ ! -f "${{ secrets.PARAMS }}" ]; then 
+            touch params.yaml && PARAMS=./params.yaml
+          else
+            PARAMS="${{ secrets.PARAMS }}"
+          fi
+          
+          # Generate Helm deployment
+          helm template -f k8s/DATACENTER/ENVIRONMENT.yml \
+            -f $SECRETS -f $PARAMS \
+            --set name=${{ inputs.PROJ_SERVICE_NAME }} \
+            --set artifact.version=$SEMVER \
+            --set environment.DEPLOY_VERSION=${SEMVER}_${{ github.ref_name }} \
+            $TMPL_HELM_ARGS $TMPL_HELM > helm_deployment.yml
+          
+          helm registry logout harbor.use.ucdp.net
+          echo -e "\e[0Ksection_end:`date +%s`:helm_configuration_section\r\e[0K"
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-deployment
+          path: helm_deployment.yml

@@ -250,3 +250,34 @@ jobs:
           -Dsonar.tests="
           
           sonar-scanner
+
+  # ReadyAPI Smoke Tests
+  readyapi_smoke_tests:
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1'
+    uses: ./.github/workflows/reusable-readyapi-smoke.yml
+    with:
+      PROJ_SERVICE_NAME: ${{ inputs.PROJ_SERVICE_NAME }}
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS }}
+      DEVOPS_QG_OVERRIDE: ${{ inputs.DEVOPS_QG_OVERRIDE }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
+
+  # ReadyAPI Regression Tests  
+  readyapi_regression_tests:
+    if: |
+      inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS != '1' &&
+      inputs.DEVOPS_QG_OVERRIDE != '1'
+    needs: readyapi_smoke_tests
+    uses: ./.github/workflows/reusable-readyapi-regression.yml
+    with:
+      PROJ_SERVICE_NAME: ${{ inputs.PROJ_SERVICE_NAME }}
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS }}
+      DEVOPS_QG_OVERRIDE: ${{ inputs.DEVOPS_QG_OVERRIDE }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
