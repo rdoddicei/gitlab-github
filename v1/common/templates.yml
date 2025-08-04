@@ -1,0 +1,305 @@
+stages:
+  - Semver
+  - Build
+  - Build[Non-Prod]
+  - Quality_Gates
+  - Non-Production
+  - Quality_Gate[Smoke]
+  - Quality_Gate[Regression]
+  - Build[Prod]
+  - Production
+  - Publish
+
+variables:
+  TMPL_DOCKER_REPO: harbor.use.ucdp.net
+  TMPL_TEAMS_URL: $SCRT_NONPROD_DEPLOYMENT_TEAMS
+  TMPL_HELM: oci://harbor.use.ucdp.net/udx-devops/helm-udx-deployment
+  TMPL_CRON_HELM: oci://harbor.use.ucdp.net/udx-devops/helm-udx-cronjob
+  TMPL_DOCKER_FILE_PATH: Dockerfile
+  TMPL_DEPLOYMENT_TIMEOUT: 180s
+  TMPL_PACKAGEJSON_PATH: ./package.json
+  TMPL_DOCKER_PATH: .
+
+  #.NET Project Variables
+  PROJ_DOTNET_APPSETTINGS_PATH: ./**
+
+  #Quality Gates
+  TMPL_TEST_NGINX_BASE: /opt/rh/nginx16/root/usr/share/nginx/DEVhtml
+  TMPL_QA_TEST_DIRECTORY: qatests
+
+  ##Images
+  TMPL_SEMVER_IMAGE: harbor.use.ucdp.net/upto_common/gitlab-semver-helper:latest
+  TMPL_KUBECTL_IMAGE: harbor.use.ucdp.net/upto_common/kubectl-image
+
+.script_devops_watermark:
+  script:
+    - | 
+        echo -e "\e[93m#----------------------------------------UDX DevOps CI/CD Pipeline----------------------------------------"
+        echo -e "#"
+        echo -e "# \e[93mThis pipeline is owned and supported by the UDX DevOps team."
+        echo -e "# \e[93mFor any questions, please contact us using the information below."
+        echo -e "#"
+        echo -e "# \e[93mEmail - DevOps Technology Services <devops@universalorlando.com>"
+        echo -e "# \e[93mTeams Channel - https://teams.microsoft.com/l/channel/19%3ab7f685a70ffa4e6b97fcea001ea5cbba%40thread.tacv2/General?groupId=2b8cd482-1644-4e1f-9140-7f5439174a1d&tenantId=8e630190-cd38-4a28-b5f6-eb20ebf05f29"
+        echo -e "#"
+        echo -e "\e[93m#---------------------------------------------------------------------------------------------------------"
+
+.script_single_cluster:
+  script:
+    - >
+      if [ "$TMPL_KUBE_CONFIG" ]; then
+        echo $TMPL_KUBE_CONFIG > ./TMPL_KUBE_CONFIG
+        echo $TMPL_DEPLOYMENT_TIMEOUT
+
+        if [ "$TMPL_IS_CRON" ]; then
+          echo -e "\e[96mDeploying Single Cluster Cron Job..."
+          kubectl --kubeconfig TMPL_KUBE_CONFIG --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME apply -f helm_deployment.yml
+        else
+          echo -e "\e[96mDeploying Single Cluster..."
+          kubectl --kubeconfig TMPL_KUBE_CONFIG --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME apply -f helm_deployment.yml
+          kubectl --kubeconfig TMPL_KUBE_CONFIG  --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout restart deployment/$PROJ_SERVICE_NAME
+          kubectl --kubeconfig TMPL_KUBE_CONFIG  --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout status deployment/$PROJ_SERVICE_NAME --timeout $TMPL_DEPLOYMENT_TIMEOUT
+        fi
+      fi
+
+.script_uo_multi_cluster:
+  script:
+    - >
+      if [[ ("$TMPL_KUBE_CONFIG_B1A" && "$TMPL_KUBE_CONFIG_B135") || ("$TMPL_KUBE_CONFIG_B1A_PCI" && "$TMPL_KUBE_CONFIG_B135_PCI")&& ! "$TMPL_IS_CRON" ]]; then
+        echo -e "\e[96mDeploying Multi Cluster..."
+        echo $TMPL_KUBE_CONFIG_B1A > config_b1a.json
+        echo $TMPL_KUBE_CONFIG_B135 > config_b135.json
+        echo $TMPL_DEPLOYMENT_TIMEOUT
+
+        kubectl --kubeconfig config_b1a.json --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME apply -f helm_deployment.yml
+        kubectl --kubeconfig config_b135.json --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME apply -f helm_deployment.yml
+        kubectl --kubeconfig config_b1a.json  --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout restart deployment/$PROJ_SERVICE_NAME
+        kubectl --kubeconfig config_b135.json --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout restart deployment/$PROJ_SERVICE_NAME
+        kubectl --kubeconfig config_b1a.json  --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout status deployment/$PROJ_SERVICE_NAME --timeout $TMPL_DEPLOYMENT_TIMEOUT
+        kubectl --kubeconfig config_b135.json --namespace=$PROJ_K8S_NAMESPACE_BASE-$CI_ENVIRONMENT_NAME rollout status deployment/$PROJ_SERVICE_NAME --timeout $TMPL_DEPLOYMENT_TIMEOUT
+      fi
+
+.script_test_setup:
+  script:
+    - !reference [.script_devops_watermark, script]
+    - >
+      if [[ -f ./angular.json && $PROJ_ANGULAR_TEST_BROWSER == "chromium" ]]; then
+        echo -e "\e[0Ksection_start:date +%s:angular_chrome_section[collapsed=true]\r\e[0KSetting up Angular Test Chromium Browser..."
+        if [ "$TMPL_UNIT_TEST_TIMEZONE" ]; then export TZ="$TMPL_UNIT_TEST_TIMEZONE"; fi # Set the desired timezone
+        apt-get update
+        apt-get install -y chromium
+        export CHROME_BIN=/usr/bin/chromium
+        npm install -g @angular/cli;
+        echo -e "\e[0Ksection_end:date +%s:angular_chrome_section\r\e[0K"
+      
+      elif [[ -f ./angular.json && $PROJ_ANGULAR_TEST_BROWSER == "firefox" ]]; then
+        echo -e "\e[0Ksection_start:date +%s:angular_firefox_section[collapsed=true]\r\e[0KSetting up Angular Test Firefox Browser..."
+        if [ "$TMPL_UNIT_TEST_TIMEZONE" ]; then export TZ="$TMPL_UNIT_TEST_TIMEZONE"; fi # Set the desired timezone
+        apt update
+        apt install firefox-esr -y;
+        echo -e "\e[0Ksection_end:date +%s:angular_firefox_section\r\e[0K"
+      
+      elif [[ -f ./angular.json && ! $PROJ_ANGULAR_TEST_BROWSER ]]; then
+        echo -e "\e[91mPROJ_ANGULAR_TEST_BROWSER must be set to required testing browser. Please check gitlab-ci for this variable"
+        exit 1;
+      fi
+      
+      if [ -f "$UNIT_TEST_DOTENV" ]; then
+        if [ "$TMPL_UNIT_TEST_TIMEZONE" ]; then export TZ="$TMPL_UNIT_TEST_TIMEZONE"; fi # Set the desired timezone
+        echo -e "\e[93mSetting Dot Env File"
+        cp $UNIT_TEST_DOTENV ./.env;
+      fi
+      
+      if [[ -f "$SCRT_NPMRC_TOKEN" && -f "$TMPL_PACKAGEJSON_PATH" ]]; then 
+        if [ "$TMPL_UNIT_TEST_TIMEZONE" ]; then export TZ="$TMPL_UNIT_TEST_TIMEZONE"; fi # Set the desired timezone
+        echo -e "\e[93mSetting NPMRC"
+        cp $SCRT_NPMRC_TOKEN .npmrc; 
+      fi
+
+.semver_template:
+  stage: Semver
+  image: $TMPL_SEMVER_IMAGE
+  script:
+    - !reference [.script_devops_watermark, script]
+    - dotnet /app/gitlab-semver-helper.dll -accessToken $SCRT_GITLAB_API_PRIVATE_TOKEN -modPipelineRevision "True"
+    - echo "SEMVER=$(cat ./version.txt)" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - version.txt
+  allow_failure: false
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/ || $CI_COMMIT_BRANCH =~ /^feature/
+  tags:
+    - docker
+
+.build_image_template:
+  stage: Build
+  needs:
+    - job: Semver
+  script:
+    - !reference [ .script_devops_watermark, script ]
+    - if [[ -f "$SCRT_NPMRC_TOKEN" && -f "$TMPL_PACKAGEJSON_PATH" ]]; then cp $SCRT_NPMRC_TOKEN .npmrc; fi
+    - SEMVER=$SEMVER$TMPL_VERSION_SUFFIX
+    - echo Build Version - $SEMVER
+    - docker login -u $SCRT_HARBOR_USERNAME -p $SCRT_HARBOR_PASSWORD $TMPL_DOCKER_REPO
+    - echo -e "\e[0Ksection_start:date +%s:docker_build_section[collapsed=true]\r\e[0KBuild Docker Image..."
+    - docker build $TMPL_DOCKER_BUILD_ARGS -t $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER -f $TMPL_DOCKER_FILE_PATH $TMPL_DOCKER_PATH
+    - echo -e "\e[0Ksection_end:date +%s:docker_build_section\r\e[0K"
+    - docker tag $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:latest$TMPL_VERSION_SUFFIX
+    - docker push $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER
+    - docker push $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:latest$TMPL_VERSION_SUFFIX
+    - docker image rm $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:latest$TMPL_VERSION_SUFFIX
+    - docker logout $TMPL_DOCKER_REPO
+  allow_failure: false
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/ || $CI_COMMIT_BRANCH =~ /^feature/
+  tags:
+    - docker
+
+.build_image_no_push_template:
+  stage: Build
+  script:
+    - !reference [ .script_devops_watermark, script ]
+    - if [[ -f "$SCRT_NPMRC_TOKEN" && -f "$TMPL_PACKAGEJSON_PATH" ]]; then cp $SCRT_NPMRC_TOKEN .npmrc; fi
+    - docker build $TMPL_DOCKER_BUILD_ARGS -t $PROJ_SERVICE_NAME:$CI_COMMIT_REF_SLUG -f $TMPL_DOCKER_FILE_PATH $TMPL_DOCKER_PATH
+    - docker image rm $PROJ_SERVICE_NAME:$CI_COMMIT_REF_SLUG
+  allow_failure: false
+  tags:
+    - docker
+
+.unit_test_template:
+  stage: Quality_Gates
+  image: $TMPL_UNIT_TEST_IMAGE
+  script:
+    - !reference [ .script_devops_watermark, script ]
+    - if [[ -f "$SCRT_NPMRC_TOKEN" && -f "$TMPL_PACKAGEJSON_PATH" ]]; then cp $SCRT_NPMRC_TOKEN .npmrc; fi
+    - echo -e "\e[91mPlease replace with language specific unit test script."
+    - exit 1
+  allow_failure: false
+  tags:
+    - docker
+
+.sonarQube_template:
+  stage: Quality_Gates
+  image: $TMPL_SONAR_IMAGE
+  script:
+    - echo -e "\e[91mPlease replace with language specific sonar test script."
+    - exit 1
+  tags:
+    - docker
+
+.readyAPI_template:
+  image: $TMPL_KUBECTL_IMAGE
+  variables:
+    GIT_STRATEGY: clone #TODO: Remove this when SOAP/RAPI server for DEP Microservices has its git version updated (default is fetch, which is faster)
+  script:
+    - !reference [ .script_devops_watermark, script ]
+    - >
+      if [ ! -d ./qatests ]; then 
+        echo -e "\e[91mQA Regession folder not found. Repository must include a smartbear directory named qatests in the root."
+        exit 1; 
+      fi
+    - export TMPL_RAPI_ENVIRONMENT=${TMPL_DATACENTER^^}-${TMPL_ENVIRONMENT_NAME^^}
+    - echo -e  "\e[96mRunning readyAPI ${TMPL_RAPI_TEST_TYPE} test scripts for the ${TMPL_RAPI_ENVIRONMENT} environment..."
+    - /opt/SmartBear/ReadyAPI-3.51.0/bin/testrunner.sh -s$TMPL_RAPI_TEST_TYPE -r -M -f $TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME/${SEMVER}_$CI_COMMIT_REF_SLUG/$TMPL_RAPI_ENVIRONMENT/ "-RTestSuite Report" -FHTML,PDF -E$TMPL_RAPI_ENVIRONMENT -I $TMPL_QA_TEST_DIRECTORY/$PROJ_SERVICE_NAME -P"X-UPR-BUILD=$CI_COMMIT_REF_SLUG" -K "$SCRT_READYAPI_TOKEN"
+    - mv "$TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME/${SEMVER}_$CI_COMMIT_REF_SLUG/$TMPL_RAPI_ENVIRONMENT/$TMPL_RAPI_TEST_TYPE/TestSuite Report.html" "$TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME/${SEMVER}_$CI_COMMIT_REF_SLUG/$TMPL_RAPI_ENVIRONMENT/$TMPL_RAPI_TEST_TYPE/${SEMVER}_$CI_COMMIT_REF_SLUG-$TMPL_RAPI_ENVIRONMENT.html"
+    - chmod -R 755 $TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME # Needed so nginx can access the files
+    - exit $(cat $TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME/${SEMVER}_$CI_COMMIT_REF_SLUG/$TMPL_RAPI_ENVIRONMENT/test_case_run_log_report.xml | grep -ci 'status="FAIL"')
+  artifacts:
+    paths:
+      - "$TMPL_TEST_NGINX_BASE/$PROJ_SERVICE_NAME/${SEMVER}_$CI_COMMIT_REF_SLUG/$TMPL_RAPI_ENVIRONMENT/$TMPL_RAPI_TEST_TYPE/TestSuite Report.pdf"
+  rules:
+    - if: $DEVOPS_QG_OVERRIDE_SMOKE_TESTS || $DEVOPS_QG_OVERRIDE
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/
+      exists:
+        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+      when: on_success
+  tags:
+    - readyapi_linux
+
+.deploy_cluster_template:
+  stage: Non-Production
+  needs:
+    - job: Semver
+    - job: Build_Image
+    - job: Unit_Test
+      optional: true
+  image: $TMPL_KUBECTL_IMAGE
+  variables:
+    TMPL_K8_PATH: k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+  script:
+    - !reference [ .script_devops_watermark, script ]
+    - SEMVER=$SEMVER${TMPL_VERSION_SUFFIX}
+    - CI_ENVIRONMENT_NAME="${CI_ENVIRONMENT_NAME##*uo-}"
+    - CI_ENVIRONMENT_NAME="${CI_ENVIRONMENT_NAME##*pci-}"
+    - if [ $TMPL_IS_CRON ]; then TMPL_HELM=$TMPL_CRON_HELM; fi
+    - echo -e "\e[96mDeploying Build Version ${SEMVER} in the ${CI_ENVIRONMENT_NAME} environment..."
+    - echo -e "\e[0Ksection_start:date +%s:helm_configuration_section[collapsed=true]\r\e[0KConfiguring Helm Charts..."
+    # create service/secret deployment files
+    - helm registry login --username $SCRT_DEVOPS_HARBOR_AUTH_USER --password $SCRT_DEVOPS_HARBOR_AUTH_PASS harbor.use.ucdp.net #Command to log into Harbor
+    - helm pull oci://harbor.use.ucdp.net/udx-devops/helm-udx-deployment 
+    - helm dependency build $TMPL_HELM || true # Build dependencies if needed, but allow failure
+    - echo $TMPL_K8_PATH
+
+    - if [ ! -f "$SECRETS" ]; then touch secrets.yaml && SECRETS=./secrets.yaml; fi #Create an empty file if no secrets exist in CI/CD
+    - if [ ! -f "$PARAMS" ]; then touch params.yaml && PARAMS=./params.yaml; fi #Create an empty file if no secrets exist in CI/CD
+
+    - helm template -f $TMPL_K8_PATH -f $SECRETS -f $PARAMS --set name=$PROJ_SERVICE_NAME --set artifact.version=$SEMVER --set environment.DEPLOY_VERSION=${SEMVER}_${CI_COMMIT_BRANCH} $TMPL_HELM_ARGS $TMPL_HELM > helm_deployment.yml
+    - helm registry logout harbor.use.ucdp.net
+    - echo -e "\e[0Ksection_end:date +%s:helm_configuration_section\r\e[0K"
+
+    # deploy all k8s config, restart service, and wait for it to start
+    - echo -e "\e[0Ksection_start:date +%s:deployment_section\r\e[0KDeploying to Kubernetes..."
+    - !reference [.script_single_cluster, script]
+    - !reference [.script_uo_multi_cluster, script]
+    - echo -e "\e[0Ksection_end:date +%s:deployment_section\r\e[0K"
+
+    # update docker repo with tag for env
+    - echo -e "\e[0Ksection_start:date +%s:docker_update_section[collapsed=true]\r\e[0KUpdating Docker Repo..."
+    - docker login -u $SCRT_HARBOR_USERNAME -p $SCRT_HARBOR_PASSWORD $TMPL_DOCKER_REPO
+    - docker pull $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER
+    - docker tag $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$CI_ENVIRONMENT_NAME
+    - docker push $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$CI_ENVIRONMENT_NAME
+    - docker image rm $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$SEMVER $TMPL_DOCKER_REPO/$PROJ_HARBOR_DIRECTORY/$PROJ_IMAGE_NAME:$CI_ENVIRONMENT_NAME
+    - docker logout $TMPL_DOCKER_REPO
+    - echo -e "\e[0Ksection_end:date +%s:docker_update_section\r\e[0K"
+  after_script:
+    - echo -e "\e[0Ksection_start:date +%s:post_section[collapsed=true]\r\e[0KSending Status to MS Teams..."
+    - python3 /var/teams/teams_webhook.py $SEMVER${TMPL_VERSION_SUFFIX} $TMPL_TEAMS_URL
+    - echo -e "\e[0Ksection_end:date +%s:post_section\r\e[0K"
+  allow_failure: false
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/
+      exists:
+        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+      when: manual
+  environment:
+    name: $TMPL_DATACENTER-$TMPL_ENVIRONMENT_NAME
+  tags:
+    - $TMPL_RUNNER_TAG
+
+.deploy_feature_template:
+  extends: .deploy_cluster_template
+  needs:
+    - job: Semver
+    - job: Build_Image
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^feature/
+      exists:
+        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+      when: manual
+
+.deploy_development_template:
+  extends: .deploy_cluster_template
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      exists:
+        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH =~ /^hotfix/ || $CI_COMMIT_BRANCH =~ /^release/
+      exists:
+        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
+      when: manual
