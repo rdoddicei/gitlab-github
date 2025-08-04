@@ -1,0 +1,13 @@
+include:
+  - project: 'udx-ci-cd/udx-pipelines'
+    ref: main
+    file: 'v1/.net/service.gitlab-ci.yml'
+
+variables:
+  PROJ_SERVICE_NAME: "vl-shield"
+  PROJ_K8S_NAMESPACE_BASE: "shield"
+  PROJ_HARBOR_DIRECTORY: "dpvl"
+  PROJ_SOLUTION_NAME: "DPVL.Shield"
+  PROJ_IMAGE_NAME: "dpvl.shield"
+  TMPL_DOCKER_FILE_PATH: "./DPVL.Shield.WebService/Dockerfile"
+  TMPL_UNIT_TEST_IMAGE: mcr.microsoft.com/dotnet/sdk:9.0
