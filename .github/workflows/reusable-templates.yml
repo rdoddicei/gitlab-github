@@ -108,7 +108,7 @@ jobs:
   semver:
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.TMPL_SEMVER_IMAGE }}
+      image: harbor.use.ucdp.net/upto_common/gitlab-semver-helper:latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -230,7 +230,7 @@ jobs:
   deploy-cluster:
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.TMPL_KUBECTL_IMAGE }}
+      image: harbor.use.ucdp.net/upto_common/kubectl-image
     needs: [semver, build-image]
     steps:
       - name: Checkout
@@ -260,9 +260,9 @@ jobs:
           CI_ENVIRONMENT_NAME="${CI_ENVIRONMENT_NAME##*pci-}"
           
           if [ "${{ inputs.TMPL_IS_CRON }}" ]; then 
-            TMPL_HELM=${{ env.TMPL_CRON_HELM }}
+            TMPL_HELM="${{ inputs.TMPL_CRON_HELM }}"
           else
-            TMPL_HELM=${{ env.TMPL_HELM }}
+            TMPL_HELM="${{ inputs.TMPL_HELM }}"
           fi
           
           echo -e "\e[96mDeploying Build Version ${SEMVER} in the ${CI_ENVIRONMENT_NAME} environment..."
