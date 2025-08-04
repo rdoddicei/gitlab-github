@@ -1,277 +1,257 @@
 include:
   - local: 'v1/common/templates.yml'
 
-#Quality Gate: ReadyAPI Regression
+#Quality Gate: ReadyAPI Smoke
 
 #Feature DEV
-Regression_Feature[UO-DEV]:
+Smoke_Feature[UO-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke_Feature[UO-DEV]
-      optional: true
+    - job: Deploy_Feature[UO-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: uo
     TMPL_ENVIRONMENT_NAME: dev
   rules:
-    - if: $DEVOPS_QG_OVERRIDE_REGRESSION_TESTS || $DEVOPS_QG_OVERRIDE
+    - if: $DEVOPS_QG_OVERRIDE_SMOKE_TESTS || $DEVOPS_QG_OVERRIDE
       when: never
     - if: $CI_COMMIT_BRANCH =~ /^feature/
       exists:
-        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
-      when: manual
+        - k8s/$TMPL_DATACENTER/dev.yml
+      when: on_success
 
-Regression_Feature[USH-DEV]:
+Smoke_Feature[USH-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke_Feature[USH-DEV]
-      optional: true
+    - job: Deploy_Feature[USH-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: ush
     TMPL_ENVIRONMENT_NAME: dev
   rules:
-    - if: $DEVOPS_QG_OVERRIDE_REGRESSION_TESTS || $DEVOPS_QG_OVERRIDE
+    - if: $DEVOPS_QG_OVERRIDE_SMOKE_TESTS || $DEVOPS_QG_OVERRIDE
       when: never
     - if: $CI_COMMIT_BRANCH =~ /^feature/
       exists:
-        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
-      when: manual
+        - k8s/$TMPL_DATACENTER/dev.yml
+      when: on_success
 
-Regression_Feature[USJ-DEV]:
+Smoke_Feature[USJ-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke_Feature[USJ-DEV]
-      optional: true
+    - job: Deploy_Feature[USJ-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: usj
     TMPL_ENVIRONMENT_NAME: dev
   rules:
-    - if: $DEVOPS_QG_OVERRIDE_REGRESSION_TESTS || $DEVOPS_QG_OVERRIDE
+    - if: $DEVOPS_QG_OVERRIDE_SMOKE_TESTS || $DEVOPS_QG_OVERRIDE
       when: never
     - if: $CI_COMMIT_BRANCH =~ /^feature/
       exists:
-        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
-      when: manual
+        - k8s/$TMPL_DATACENTER/dev.yml
+      when: on_success
 
-Regression_Feature[EASTUS-AZURE-DEV]:
+Smoke_Feature[EASTUS-AZURE-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke_Feature[EASTUS-AZURE-DEV]
-      optional: true
+    - job: Deploy_Feature[EASTUS-AZURE-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: eastus-azure
     TMPL_ENVIRONMENT_NAME: dev
   rules:
-    - if: $DEVOPS_QG_OVERRIDE_REGRESSION_TESTS || $DEVOPS_QG_OVERRIDE
+    - if: $DEVOPS_QG_OVERRIDE_SMOKE_TESTS || $DEVOPS_QG_OVERRIDE
       when: never
     - if: $CI_COMMIT_BRANCH =~ /^feature/
       exists:
-        - k8s/$TMPL_DATACENTER/$TMPL_ENVIRONMENT_NAME.yml
-      when: manual
+        - k8s/$TMPL_DATACENTER/dev.yml
+      when: on_success
 
 #DEV
-Regression[UO-DEV]:
+Smoke[UO-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[UO-DEV]
-      optional: true
+    - job: Deploy[UO-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: uo
     TMPL_ENVIRONMENT_NAME: dev
 
-Regression[USH-DEV]:
+Smoke[USH-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USH-DEV]
-      optional: true
+    - job: Deploy[USH-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: ush
     TMPL_ENVIRONMENT_NAME: dev
 
-Regression[USJ-DEV]:
+Smoke[USJ-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USJ-DEV]
-      optional: true
+    - job: Deploy[USJ-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: usj
     TMPL_ENVIRONMENT_NAME: dev
 
-Regression[EASTUS-AZURE-DEV]:
+Smoke[EASTUS-AZURE-DEV]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[EASTUS-AZURE-DEV]
-      optional: true
+    - job: Deploy[EASTUS-AZURE-DEV]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: eastus-azure
     TMPL_ENVIRONMENT_NAME: dev
 
 #QA
-Regression[UO-QA]:
+Smoke[UO-QA]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[UO-QA]
-      optional: true
+    - job: Deploy[UO-QA]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: uo
     TMPL_ENVIRONMENT_NAME: qa
 
-Regression[USH-QA]:
+Smoke[USH-QA]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USH-QA]
-      optional: true
+    - job: Deploy[USH-QA]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: ush
     TMPL_ENVIRONMENT_NAME: qa
 
-Regression[USJ-QA]:
+Smoke[USJ-QA]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USJ-QA]
-      optional: true
+    - job: Deploy[USJ-QA]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: usj
     TMPL_ENVIRONMENT_NAME: qa
 
-Regression[EASTUS-AZURE-QA]:
+Smoke[EASTUS-AZURE-QA]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[EASTUS-AZURE-QA]
-      optional: true
+    - job: Deploy[EASTUS-AZURE-QA]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: eastus-azure
     TMPL_ENVIRONMENT_NAME: qa
 
 #UAT
-Regression[UO-UAT]:
+Smoke[UO-UAT]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[UO-UAT]
-      optional: true
+    - job: Deploy[UO-UAT]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: uo
     TMPL_ENVIRONMENT_NAME: uat
 
-Regression[USH-UAT]:
+Smoke[USH-UAT]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USH-UAT]
-      optional: true
+    - job: Deploy[USH-UAT]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: ush
     TMPL_ENVIRONMENT_NAME: uat
 
-Regression[USJ-UAT]:
+Smoke[USJ-UAT]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USJ-UAT]
-      optional: true
+    - job: Deploy[USJ-UAT]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: usj
     TMPL_ENVIRONMENT_NAME: uat
 
-Regression[EASTUS-AZURE-UAT]:
+Smoke[EASTUS-AZURE-UAT]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[EASTUS-AZURE-UAT]
-      optional: true
+    - job: Deploy[EASTUS-AZURE-UAT]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: eastus-azure
     TMPL_ENVIRONMENT_NAME: uat
 
 #STG
-Regression[UO-STG]:
+Smoke[UO-STG]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[UO-STG]
-      optional: true
+    - job: Deploy[UO-STG]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: uo
     TMPL_ENVIRONMENT_NAME: stg
 
-Regression[USH-STG]:
+Smoke[USH-STG]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USH-STG]
-      optional: true
+    - job: Deploy[USH-STG]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: ush
     TMPL_ENVIRONMENT_NAME: stg
 
-Regression[USJ-STG]:
+Smoke[USJ-STG]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[USJ-STG]
-      optional: true
+    - job: Deploy[USJ-STG]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: usj
     TMPL_ENVIRONMENT_NAME: stg
 
-Regression[EASTUS-AZURE-STG]:
+Smoke[EASTUS-AZURE-STG]:
   extends: .readyAPI_template
-  stage: Quality_Gate[Regression]
+  stage: Quality_Gate[Smoke]
   needs:
     - job: Semver
-    - job: Smoke[EASTUS-AZURE-STG]
-      optional: true
+    - job: Deploy[EASTUS-AZURE-STG]
   variables:
-    TMPL_RAPI_TEST_TYPE: Regression
+    TMPL_RAPI_TEST_TYPE: Smoke
     TMPL_DATACENTER: eastus-azure
     TMPL_ENVIRONMENT_NAME: stg
