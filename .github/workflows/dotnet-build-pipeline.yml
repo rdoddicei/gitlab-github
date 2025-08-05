@@ -49,6 +49,12 @@ on:
       GITLAB_API_TOKEN:
         description: 'GitLab API token for accessing external resources'
         required: false
+      HARBOR_USERNAME:
+        description: 'Harbor registry username'
+        required: false
+      HARBOR_PASSWORD:
+        description: 'Harbor registry password'
+        required: false
 
     outputs:
       version:

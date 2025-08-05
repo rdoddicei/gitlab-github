@@ -5,17 +5,43 @@ name: multi-cluster-deploy
 on:
   workflow_call:
     inputs:
+      # Project-specific variables
+      PROJ_SERVICE_NAME:
+        description: 'Service name for the project'
+        required: false
+        type: string
+      PROJ_K8S_NAMESPACE_BASE:
+        description: 'Base Kubernetes namespace'
+        required: false
+        type: string
+      PROJ_HARBOR_DIRECTORY:
+        description: 'Harbor registry directory'
+        required: false
+        type: string
+      PROJ_IMAGE_NAME:
+        description: 'Docker image name'
+        required: false
+        type: string
+      
+      # Template variables
       TMPL_RUNNER_TAG:
+        description: 'Runner tag for deployment'
         required: false
         type: string
         default: "docker"
+      
+      # CI/CD control variables
       CI_COMMIT_BRANCH:
+        description: 'Current branch name'
         required: false
         type: string
       CI_DEFAULT_BRANCH:
+        description: 'Default branch name'
         required: false
         type: string
+        default: 'main'
       CI_MERGE_REQUEST_ID:
+        description: 'Pull request/merge request ID'
         required: false
         type: string
     secrets:
