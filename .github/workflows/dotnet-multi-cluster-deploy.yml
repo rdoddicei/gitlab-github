@@ -45,6 +45,9 @@ on:
         required: false
         type: string
     secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub token for accessing private repositories'
+        required: false
       SCRT_NONPROD_KUBE_CONFIG_B1A:
         required: false
       SCRT_NONPROD_KUBE_CONFIG_B1S3:
@@ -87,6 +90,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy Feature to UO-DEV Multi-Cluster
         run: |
@@ -105,6 +110,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy Feature to UO-PCI-DEV Multi-Cluster
         run: |
@@ -125,6 +132,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-DEV Multi-Cluster
         run: |
@@ -143,6 +152,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-PCI-DEV Multi-Cluster
         run: |
@@ -163,6 +174,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-QA Multi-Cluster
         run: |
@@ -181,6 +194,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-PCI-QA Multi-Cluster
         run: |
@@ -201,6 +216,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-PROD Multi-Cluster
         run: |
@@ -219,6 +236,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-PCI-PROD Multi-Cluster
         run: |
@@ -240,6 +259,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy Feature to UO-DEV RKE2 Multi-Cluster
         run: |
@@ -259,6 +280,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to UO-PROD RKE2 Multi-Cluster
         run: |

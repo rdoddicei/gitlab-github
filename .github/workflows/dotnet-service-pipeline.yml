@@ -58,6 +58,9 @@ on:
         type: string
         
     secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub token for accessing private repositories'
+        required: false
       GITLAB_API_TOKEN:
         description: 'GitLab API token for accessing external resources'
         required: false

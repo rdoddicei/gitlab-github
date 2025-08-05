@@ -59,6 +59,9 @@ on:
         type: string
       
     secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub token for accessing private repositories'
+        required: false
       SONAR_TOKEN:
         description: 'SonarQube authentication token'
         required: false
@@ -77,6 +80,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore NuGet Packages
         run: |
@@ -158,6 +163,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0  # Shallow clones should be disabled for better analysis
 
       - name: Download Test Results
@@ -212,6 +218,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Smoke Tests
         run: |
@@ -236,6 +244,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Regression Tests
         run: |
