@@ -42,6 +42,28 @@ on:
         type: string
         default: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-8.0"
       
+      # Quality gate overrides
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS:
+        description: 'Override unit tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "0"
+      DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS:
+        description: 'Override SonarQube analysis (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "0"
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS:
+        description: 'Override smoke tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "1"
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS:
+        description: 'Override regression tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "1"
+        
       # CI/CD control variables
       CI_COMMIT_BRANCH:
         description: 'Current branch name'
@@ -64,11 +86,47 @@ on:
       GITLAB_API_TOKEN:
         description: 'GitLab API token for accessing external resources'
         required: false
+      SONAR_TOKEN:
+        description: 'SonarQube authentication token'
+        required: false
       HARBOR_USERNAME:
         description: 'Harbor registry username'
         required: false
       HARBOR_PASSWORD:
         description: 'Harbor registry password'
+        required: false
+      # Kubernetes configuration secrets for multi-cluster deployment
+      SCRT_NONPROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1A_PCI_RKE2:
+        required: false
+      SCRT_NONPROD_KUBE_CONFIG_B1S3_PCI_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_PCI:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1A_PCI_RKE2:
+        required: false
+      SCRT_PROD_KUBE_CONFIG_B1S3_PCI_RKE2:
         required: false
 
 jobs:
@@ -96,6 +154,10 @@ jobs:
       TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
       TMPL_SONAR_IMAGE: ${{ inputs.TMPL_SONAR_IMAGE }}
       PROJ_SOLUTION_NAME: ${{ inputs.PROJ_SOLUTION_NAME }}
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS }}
+      DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS: ${{ inputs.DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS }}
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS }}
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS: ${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS }}
       CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
       CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
       CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
