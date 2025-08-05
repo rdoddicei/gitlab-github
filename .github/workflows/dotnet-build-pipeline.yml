@@ -1,0 +1,155 @@
+name: .NET Build Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      # Template variables
+      TMPL_UNIT_TEST_IMAGE:
+        description: '.NET SDK image for building and testing'
+        required: false
+        type: string
+        default: "mcr.microsoft.com/dotnet/sdk:8.0"
+      TMPL_SONAR_IMAGE:
+        description: 'SonarQube analysis image'
+        required: false
+        type: string
+        default: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-8.0"
+      TMPL_DOCKER_FILE_PATH:
+        description: 'Path to Dockerfile'
+        required: false
+        type: string
+        default: './Dockerfile'
+      
+      # Project variables
+      PROJ_SOLUTION_NAME:
+        description: '.NET solution name'
+        required: false
+        type: string
+      PROJ_IMAGE_NAME:
+        description: 'Docker image name'
+        required: false
+        type: string
+        
+      # CI/CD control variables
+      CI_COMMIT_BRANCH:
+        description: 'Current branch name'
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        description: 'Default branch name'
+        required: false
+        type: string
+        default: 'main'
+      CI_MERGE_REQUEST_ID:
+        description: 'Pull request/merge request ID'
+        required: false
+        type: string
+        
+    secrets:
+      GITLAB_API_TOKEN:
+        description: 'GitLab API token for accessing external resources'
+        required: false
+
+    outputs:
+      version:
+        description: 'Generated semantic version'
+        value: ${{ jobs.semantic-versioning.outputs.version }}
+      image-tag:
+        description: 'Docker image tag'
+        value: ${{ jobs.semantic-versioning.outputs.version }}
+
+jobs:
+  # Generate semantic version for the build
+  semantic-versioning:
+    name: Generate Version
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for proper versioning
+
+      - name: Generate Semantic Version
+        id: version
+        run: |
+          # Generate semantic version based on branch and build number
+          BASE_VERSION="1.0"
+          BUILD_NUMBER="${{ github.run_number }}"
+          
+          if [[ "${{ inputs.CI_COMMIT_BRANCH }}" == "${{ inputs.CI_DEFAULT_BRANCH }}" ]]; then
+            # Main branch: use semantic versioning
+            VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
+          elif [[ "${{ inputs.CI_MERGE_REQUEST_ID }}" != "" ]]; then
+            # Pull request: include PR number
+            VERSION="${BASE_VERSION}.${BUILD_NUMBER}-pr${{ inputs.CI_MERGE_REQUEST_ID }}"
+          else
+            # Feature branch: include branch name (sanitized)
+            BRANCH_NAME="${{ inputs.CI_COMMIT_BRANCH }}"
+            SANITIZED_BRANCH=$(echo "${BRANCH_NAME}" | sed 's/[^a-zA-Z0-9.-]/-/g' | tr '[:upper:]' '[:lower:]')
+            VERSION="${BASE_VERSION}.${BUILD_NUMBER}-${SANITIZED_BRANCH}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🏷️ Generated version: $VERSION"
+          echo "📝 Branch: ${{ inputs.CI_COMMIT_BRANCH }}"
+          echo "🔢 Build number: ${BUILD_NUMBER}"
+
+  # Build Docker image and push to registry
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: semantic-versioning
+    strategy:
+      matrix:
+        include:
+          - condition: "main-branch"
+            should_push: true
+            if_condition: ${{ inputs.CI_COMMIT_BRANCH == inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
+          - condition: "pull-request"
+            should_push: false
+            if_condition: ${{ inputs.CI_MERGE_REQUEST_ID != '' }}
+          - condition: "feature-branch"
+            should_push: false
+            if_condition: ${{ inputs.CI_COMMIT_BRANCH != inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
+    
+    if: ${{ matrix.if_condition }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Harbor Registry
+        if: matrix.should_push
+        uses: docker/login-action@v3
+        with:
+          registry: harbor.use.ucdp.net
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+          push: ${{ matrix.should_push }}
+          tags: |
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:${{ needs.semantic-versioning.outputs.version }}
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Summary
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ inputs.PROJ_IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${{ needs.semantic-versioning.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push to Registry**: \`${{ matrix.should_push }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Condition**: \`${{ matrix.condition }}\`" >> $GITHUB_STEP_SUMMARY

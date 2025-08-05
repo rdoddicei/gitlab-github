@@ -1,0 +1,115 @@
+name: .NET Service Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      # Project-specific variables
+      PROJ_SERVICE_NAME:
+        description: 'Service name for the project'
+        required: false
+        type: string
+      PROJ_K8S_NAMESPACE_BASE:
+        description: 'Base Kubernetes namespace'
+        required: false
+        type: string
+      PROJ_HARBOR_DIRECTORY:
+        description: 'Harbor registry directory'
+        required: false
+        type: string
+      PROJ_SOLUTION_NAME:
+        description: '.NET solution name'
+        required: false
+        type: string
+      PROJ_IMAGE_NAME:
+        description: 'Docker image name'
+        required: false
+        type: string
+      TMPL_DOCKER_FILE_PATH:
+        description: 'Path to Dockerfile'
+        required: false
+        type: string
+        default: './Dockerfile'
+      
+      # Template variables
+      TMPL_UNIT_TEST_IMAGE:
+        description: '.NET SDK image for unit tests'
+        required: false
+        type: string
+        default: "mcr.microsoft.com/dotnet/sdk:8.0"
+      TMPL_SONAR_IMAGE:
+        description: 'SonarQube analysis image'
+        required: false
+        type: string
+        default: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-8.0"
+      
+      # CI/CD control variables
+      CI_COMMIT_BRANCH:
+        description: 'Current branch name'
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        description: 'Default branch name'
+        required: false
+        type: string
+        default: 'main'
+      CI_MERGE_REQUEST_ID:
+        description: 'Pull request/merge request ID'
+        required: false
+        type: string
+        
+    secrets:
+      GITLAB_API_TOKEN:
+        description: 'GitLab API token for accessing external resources'
+        required: false
+      HARBOR_USERNAME:
+        description: 'Harbor registry username'
+        required: false
+      HARBOR_PASSWORD:
+        description: 'Harbor registry password'
+        required: false
+
+jobs:
+  # Build stage - compiles code and creates Docker images
+  build:
+    name: Build & Package
+    uses: rdoddicei/gitlab-github/.github/workflows/dotnet-build-pipeline.yml@main
+    with:
+      TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+      TMPL_SONAR_IMAGE: ${{ inputs.TMPL_SONAR_IMAGE }}
+      TMPL_DOCKER_FILE_PATH: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+      PROJ_SOLUTION_NAME: ${{ inputs.PROJ_SOLUTION_NAME }}
+      PROJ_IMAGE_NAME: ${{ inputs.PROJ_IMAGE_NAME }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
+
+  # Quality assurance stage - runs tests and code analysis
+  quality-assurance:
+    name: Quality Gates
+    needs: build
+    uses: rdoddicei/gitlab-github/.github/workflows/dotnet-quality-gates.yml@main
+    with:
+      TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+      TMPL_SONAR_IMAGE: ${{ inputs.TMPL_SONAR_IMAGE }}
+      PROJ_SOLUTION_NAME: ${{ inputs.PROJ_SOLUTION_NAME }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit
+
+  # Deployment stage - deploys to multiple clusters
+  deployment:
+    name: Multi-Cluster Deployment
+    needs: build
+    if: ${{ inputs.CI_MERGE_REQUEST_ID == '' }}  # Only deploy on direct pushes, not PRs
+    uses: rdoddicei/gitlab-github/.github/workflows/dotnet-multi-cluster-deploy.yml@main
+    with:
+      PROJ_SERVICE_NAME: ${{ inputs.PROJ_SERVICE_NAME }}
+      PROJ_K8S_NAMESPACE_BASE: ${{ inputs.PROJ_K8S_NAMESPACE_BASE }}
+      PROJ_HARBOR_DIRECTORY: ${{ inputs.PROJ_HARBOR_DIRECTORY }}
+      PROJ_IMAGE_NAME: ${{ inputs.PROJ_IMAGE_NAME }}
+      CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
+      CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
+      CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
+    secrets: inherit

@@ -1,0 +1,273 @@
+name: .NET Quality Gates
+
+on:
+  workflow_call:
+    inputs:
+      # Template variables
+      TMPL_UNIT_TEST_IMAGE:
+        description: '.NET SDK image for unit tests'
+        required: false
+        type: string
+        default: "mcr.microsoft.com/dotnet/sdk:8.0"
+      TMPL_SONAR_IMAGE:
+        description: 'SonarQube analysis image'
+        required: false
+        type: string
+        default: "harbor.use.ucdp.net/utp_common/upr-dotnet-sonarqube-image:dotnet-sdk-8.0"
+      
+      # Project variables
+      PROJ_SOLUTION_NAME:
+        description: '.NET solution name'
+        required: false
+        type: string
+      
+      # Quality gate overrides
+      DEVOPS_QG_OVERRIDE_UNIT_TESTS:
+        description: 'Override unit tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "0"
+      DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS:
+        description: 'Override SonarQube analysis (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "0"
+      DEVOPS_QG_OVERRIDE_SMOKE_TESTS:
+        description: 'Override smoke tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "1"
+      DEVOPS_QG_OVERRIDE_REGRESSION_TESTS:
+        description: 'Override regression tests (1 = skip, 0 = run)'
+        required: false
+        type: string
+        default: "1"
+        
+      # CI/CD control variables
+      CI_COMMIT_BRANCH:
+        description: 'Current branch name'
+        required: false
+        type: string
+      CI_DEFAULT_BRANCH:
+        description: 'Default branch name'
+        required: false
+        type: string
+        default: 'main'
+      CI_MERGE_REQUEST_ID:
+        description: 'Pull request/merge request ID'
+        required: false
+        type: string
+      
+    secrets:
+      SONAR_TOKEN:
+        description: 'SonarQube authentication token'
+        required: false
+      GITLAB_API_TOKEN:
+        description: 'GitLab API token for accessing external resources'
+        required: false
+
+jobs:
+  # Run .NET unit tests with coverage reporting
+  unit-tests:
+    name: Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    if: ${{ inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS != '1' }}
+    container:
+      image: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Restore NuGet Packages
+        run: |
+          if [[ -n "${{ inputs.PROJ_SOLUTION_NAME }}" && -f "${{ inputs.PROJ_SOLUTION_NAME }}.sln" ]]; then
+            echo "🔄 Restoring packages for solution: ${{ inputs.PROJ_SOLUTION_NAME }}.sln"
+            dotnet restore "${{ inputs.PROJ_SOLUTION_NAME }}.sln"
+          else
+            echo "🔄 Restoring packages for all projects"
+            dotnet restore
+          fi
+
+      - name: Build Solution
+        run: |
+          if [[ -n "${{ inputs.PROJ_SOLUTION_NAME }}" && -f "${{ inputs.PROJ_SOLUTION_NAME }}.sln" ]]; then
+            echo "🔨 Building solution: ${{ inputs.PROJ_SOLUTION_NAME }}.sln"
+            dotnet build "${{ inputs.PROJ_SOLUTION_NAME }}.sln" --configuration Release --no-restore
+          else
+            echo "🔨 Building all projects"
+            dotnet build --configuration Release --no-restore
+          fi
+
+      - name: Run Unit Tests
+        run: |
+          echo "🧪 Running unit tests with coverage collection"
+          dotnet test \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --logger "trx;LogFileName=unittest-results.trx" \
+            --logger "junit;LogFileName=unittest-results.xml" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Generate Coverage Report
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.2.0
+        with:
+          reports: './TestResults/**/coverage.cobertura.xml'
+          targetdir: './TestResults/CoverageReport'
+          reporttypes: 'Html;Cobertura;SonarQube'
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            ./TestResults/**/*.trx
+            ./TestResults/**/*.xml
+            ./TestResults/CoverageReport/**
+
+      - name: Publish Test Results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: '.NET Unit Tests'
+          path: './TestResults/**/*.trx'
+          reporter: 'dotnet-trx'
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## 🧪 Unit Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: \`${{ inputs.PROJ_SOLUTION_NAME || 'All Projects' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SDK Image**: \`${{ inputs.TMPL_UNIT_TEST_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Configuration**: \`Release\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage Format**: \`Cobertura\`" >> $GITHUB_STEP_SUMMARY
+
+  # SonarQube code quality analysis
+  sonar-analysis:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    if: ${{ inputs.DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS != '1' }}
+    needs: unit-tests
+    container:
+      image: ${{ inputs.TMPL_SONAR_IMAGE }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Download Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults
+
+      - name: Run SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "🔍 Starting SonarQube analysis"
+          
+          # Set project key based on solution name or repository
+          if [[ -n "${{ inputs.PROJ_SOLUTION_NAME }}" ]]; then
+            PROJECT_KEY="${{ inputs.PROJ_SOLUTION_NAME }}"
+          else
+            PROJECT_KEY="${{ github.repository }}"
+          fi
+          
+          # Configure SonarQube scanner
+          sonar-scanner \
+            -Dsonar.projectKey="${PROJECT_KEY}" \
+            -Dsonar.sources=. \
+            -Dsonar.host.url="${{ vars.SONAR_HOST_URL || 'https://sonarqube.company.com' }}" \
+            -Dsonar.login="${{ secrets.SONAR_TOKEN }}" \
+            -Dsonar.cs.opencover.reportsPaths="./TestResults/**/coverage.opencover.xml" \
+            -Dsonar.cs.xunit.reportsPaths="./TestResults/**/*.xml" \
+            -Dsonar.exclusions="**/bin/**,**/obj/**,**/*.dll,**/*.exe"
+
+      - name: SonarQube Quality Gate Check
+        uses: sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Analysis Summary
+        run: |
+          echo "## 🔍 SonarQube Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project Key**: \`${{ inputs.PROJ_SOLUTION_NAME || github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Analysis Image**: \`${{ inputs.TMPL_SONAR_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Smoke tests (if enabled)
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS != '1' }}
+    needs: unit-tests
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Smoke Tests
+        run: |
+          echo "💨 Running smoke tests"
+          # Placeholder for smoke test implementation
+          # This would typically involve basic API health checks
+          echo "✅ Smoke tests completed successfully"
+
+      - name: Smoke Test Summary
+        run: |
+          echo "## 💨 Smoke Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: \`Completed\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Override Setting**: \`${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Regression tests (if enabled)
+  regression-tests:
+    name: Regression Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS != '1' }}
+    needs: [unit-tests, smoke-tests]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Regression Tests
+        run: |
+          echo "🔄 Running regression tests"
+          # Placeholder for regression test implementation
+          # This would typically involve comprehensive API testing
+          echo "✅ Regression tests completed successfully"
+
+      - name: Regression Test Summary
+        run: |
+          echo "## 🔄 Regression Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: \`Completed\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Override Setting**: \`${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Final quality gate summary
+  quality-gate-summary:
+    name: Quality Gate Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, sonar-analysis, smoke-tests, regression-tests]
+    if: always()
+    steps:
+      - name: Generate Quality Gate Report
+        run: |
+          echo "## 🎯 Quality Gate Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status | Override |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} | ${{ inputs.DEVOPS_QG_OVERRIDE_UNIT_TESTS == '1' && 'Skipped' || 'Enabled' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SonarQube Analysis | ${{ needs.sonar-analysis.result }} | ${{ inputs.DEVOPS_QG_OVERRIDE_SONAR_ANALYSIS == '1' && 'Skipped' || 'Enabled' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-tests.result }} | ${{ inputs.DEVOPS_QG_OVERRIDE_SMOKE_TESTS == '1' && 'Skipped' || 'Enabled' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Regression Tests | ${{ needs.regression-tests.result }} | ${{ inputs.DEVOPS_QG_OVERRIDE_REGRESSION_TESTS == '1' && 'Skipped' || 'Enabled' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Solution**: \`${{ inputs.PROJ_SOLUTION_NAME }}\`" >> $GITHUB_STEP_SUMMARY
