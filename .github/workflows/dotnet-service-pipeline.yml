@@ -1,4 +1,10 @@
-name: .NET Service Pipeline
+name: .NET Service Pipeline (Reusable)
+
+# This workflow is designed to be called from external repositories
+# It provides a complete .NET service CI/CD pipeline including:
+# - Build and packaging
+# - Quality assurance (tests, SonarQube)
+# - Multi-cluster deployment
 
 on:
   workflow_call:
