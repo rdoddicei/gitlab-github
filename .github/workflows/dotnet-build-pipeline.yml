@@ -98,25 +98,12 @@ jobs:
           echo "📝 Branch: ${{ inputs.CI_COMMIT_BRANCH }}"
           echo "🔢 Build number: ${BUILD_NUMBER}"
 
-  # Build Docker image and push to registry
-  docker-build:
-    name: Docker Build
+  # Build Docker image for main branch (with push)
+  docker-build-main:
+    name: Docker Build (Main Branch)
     runs-on: ubuntu-latest
     needs: semantic-versioning
-    strategy:
-      matrix:
-        include:
-          - condition: "main-branch"
-            should_push: true
-            if_condition: ${{ inputs.CI_COMMIT_BRANCH == inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
-          - condition: "pull-request"
-            should_push: false
-            if_condition: ${{ inputs.CI_MERGE_REQUEST_ID != '' }}
-          - condition: "feature-branch"
-            should_push: false
-            if_condition: ${{ inputs.CI_COMMIT_BRANCH != inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
-    
-    if: ${{ matrix.if_condition }}
+    if: ${{ inputs.CI_COMMIT_BRANCH == inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -125,7 +112,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Harbor Registry
-        if: matrix.should_push
         uses: docker/login-action@v3
         with:
           registry: harbor.use.ucdp.net
@@ -137,7 +123,7 @@ jobs:
         with:
           context: .
           file: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
-          push: ${{ matrix.should_push }}
+          push: true
           tags: |
             harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:${{ needs.semantic-versioning.outputs.version }}
             harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:latest
@@ -146,10 +132,77 @@ jobs:
 
       - name: Build Summary
         run: |
-          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🐳 Docker Build Summary (Main Branch)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: \`${{ inputs.PROJ_IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: \`${{ needs.semantic-versioning.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Push to Registry**: \`${{ matrix.should_push }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Condition**: \`${{ matrix.condition }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push to Registry**: \`true\`" >> $GITHUB_STEP_SUMMARY
+
+  # Build Docker image for pull requests (no push)
+  docker-build-pr:
+    name: Docker Build (Pull Request)
+    runs-on: ubuntu-latest
+    needs: semantic-versioning
+    if: ${{ inputs.CI_MERGE_REQUEST_ID != '' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image (No Push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+          push: false
+          tags: |
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:pr-${{ inputs.CI_MERGE_REQUEST_ID }}
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Summary
+        run: |
+          echo "## 🐳 Docker Build Summary (Pull Request)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ inputs.PROJ_IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`pr-${{ inputs.CI_MERGE_REQUEST_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push to Registry**: \`false\`" >> $GITHUB_STEP_SUMMARY
+
+  # Build Docker image for feature branches (no push)
+  docker-build-feature:
+    name: Docker Build (Feature Branch)
+    runs-on: ubuntu-latest
+    needs: semantic-versioning
+    if: ${{ inputs.CI_COMMIT_BRANCH != inputs.CI_DEFAULT_BRANCH && inputs.CI_MERGE_REQUEST_ID == '' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image (No Push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+          push: false
+          tags: |
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:${{ needs.semantic-versioning.outputs.version }}
+            harbor.use.ucdp.net/${{ inputs.PROJ_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Summary
+        run: |
+          echo "## 🐳 Docker Build Summary (Feature Branch)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ inputs.PROJ_IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${{ needs.semantic-versioning.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ inputs.CI_COMMIT_BRANCH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push to Registry**: \`false\`" >> $GITHUB_STEP_SUMMARY
