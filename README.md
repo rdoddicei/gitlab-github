@@ -10,25 +10,23 @@ This repository contains reusable GitHub Actions workflows for .NET applications
   - Supports conditional deployment (skips PRs)
   - Cross-repository reusable workflow calls
 
-### Core Reusable Workflows
-- **`reusable-build.yml`** - Build and Docker image creation
-  - Semantic versioning
-  - Docker image building and pushing
-  - Support for different branch strategies
+### Core Workflows
+- **`dotnet-build-pipeline.yml`** - Build and Docker image creation
+  - Semantic versioning with branch-based strategies
+  - Docker image building and registry pushing
+  - Harbor registry integration
+  - Build caching and optimization
 
-- **`reusable-quality-gates.yml`** - Quality assurance and testing
-  - Unit tests with coverage
-  - SonarQube integration
-  - Quality gate overrides
+- **`dotnet-quality-gates.yml`** - Quality assurance and testing
+  - Unit tests with coverage reporting
+  - SonarQube integration and quality gates
+  - Optional smoke and regression tests
+  - Comprehensive test reporting
 
-- **`reusable-multi-cluster-deploy.yml`** - Multi-cluster deployment
-  - Multiple environment support
-  - Kubernetes deployment
+- **`dotnet-multi-cluster-deploy.yml`** - Multi-cluster deployment
+  - Multiple environment support (DEV, QA, UAT, PROD)
+  - Kubernetes deployment across clusters
   - Multi-datacenter capabilities
-
-### Standalone Quality Workflows (Enhanced)
-- **`dotnet-build-pipeline.yml`** - Advanced build pipeline with comprehensive features
-- **`dotnet-quality-gates.yml`** - Enhanced quality gates with detailed reporting
 
 ## 📋 Usage Examples
 
@@ -60,18 +58,21 @@ jobs:
 ```yaml
 jobs:
   build:
-    uses: rdoddicei/gitlab-github/.github/workflows/reusable-build.yml@main
+    uses: rdoddicei/gitlab-github/.github/workflows/dotnet-build-pipeline.yml@main
     with:
       TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:8.0"
+      PROJ_SOLUTION_NAME: "MySolution"
+      PROJ_IMAGE_NAME: "my-company/my-service"
       CI_COMMIT_BRANCH: ${{ github.ref_name }}
     secrets: inherit
 
   quality-gates:
     needs: build
-    uses: rdoddicei/gitlab-github/.github/workflows/reusable-quality-gates.yml@main
+    uses: rdoddicei/gitlab-github/.github/workflows/dotnet-quality-gates.yml@main
     with:
       TMPL_UNIT_TEST_IMAGE: "mcr.microsoft.com/dotnet/sdk:8.0"
       TMPL_SONAR_IMAGE: "sonarqube/sonar-scanner-cli:latest"
+      PROJ_SOLUTION_NAME: "MySolution"
     secrets: inherit
 ```
 
@@ -120,11 +121,9 @@ GITLAB_API_TOKEN        # GitLab API token (if needed)
 .github/
 └── workflows/
     ├── dotnet-service-pipeline.yml      # Main orchestrator workflow
-    ├── dotnet-build-pipeline.yml        # Enhanced build pipeline
-    ├── dotnet-quality-gates.yml         # Enhanced quality gates
-    ├── reusable-build.yml               # Core build workflow
-    ├── reusable-quality-gates.yml       # Core quality workflow
-    └── reusable-multi-cluster-deploy.yml # Deployment workflow
+    ├── dotnet-build-pipeline.yml        # Build and Docker pipeline
+    ├── dotnet-quality-gates.yml         # Quality assurance pipeline
+    └── dotnet-multi-cluster-deploy.yml  # Multi-cluster deployment
 ```
 
 ## 🎯 Key Features

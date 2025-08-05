@@ -72,10 +72,13 @@ jobs:
   # Build stage - compiles code and creates Docker images
   build:
     name: Build & Package
-    uses: ./.github/workflows/reusable-build.yml
+    uses: ./.github/workflows/dotnet-build-pipeline.yml
     with:
       TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
       TMPL_SONAR_IMAGE: ${{ inputs.TMPL_SONAR_IMAGE }}
+      TMPL_DOCKER_FILE_PATH: ${{ inputs.TMPL_DOCKER_FILE_PATH }}
+      PROJ_SOLUTION_NAME: ${{ inputs.PROJ_SOLUTION_NAME }}
+      PROJ_IMAGE_NAME: ${{ inputs.PROJ_IMAGE_NAME }}
       CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
       CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
       CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
@@ -85,10 +88,11 @@ jobs:
   quality-assurance:
     name: Quality Gates
     needs: build
-    uses: ./.github/workflows/reusable-quality-gates.yml
+    uses: ./.github/workflows/dotnet-quality-gates.yml
     with:
       TMPL_UNIT_TEST_IMAGE: ${{ inputs.TMPL_UNIT_TEST_IMAGE }}
       TMPL_SONAR_IMAGE: ${{ inputs.TMPL_SONAR_IMAGE }}
+      PROJ_SOLUTION_NAME: ${{ inputs.PROJ_SOLUTION_NAME }}
       CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
       CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
       CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
@@ -99,8 +103,12 @@ jobs:
     name: Multi-Cluster Deployment
     needs: build
     if: ${{ inputs.CI_MERGE_REQUEST_ID == '' }}  # Only deploy on direct pushes, not PRs
-    uses: ./.github/workflows/reusable-multi-cluster-deploy.yml
+    uses: ./.github/workflows/dotnet-multi-cluster-deploy.yml
     with:
+      PROJ_SERVICE_NAME: ${{ inputs.PROJ_SERVICE_NAME }}
+      PROJ_K8S_NAMESPACE_BASE: ${{ inputs.PROJ_K8S_NAMESPACE_BASE }}
+      PROJ_HARBOR_DIRECTORY: ${{ inputs.PROJ_HARBOR_DIRECTORY }}
+      PROJ_IMAGE_NAME: ${{ inputs.PROJ_IMAGE_NAME }}
       CI_COMMIT_BRANCH: ${{ inputs.CI_COMMIT_BRANCH }}
       CI_DEFAULT_BRANCH: ${{ inputs.CI_DEFAULT_BRANCH }}
       CI_MERGE_REQUEST_ID: ${{ inputs.CI_MERGE_REQUEST_ID }}
